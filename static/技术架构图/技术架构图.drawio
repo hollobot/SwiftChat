@@ -1,0 +1,109 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36">
+  <diagram name="SwiftChat用户功能用例图" id="swiftchat-user-usecase-final">
+    <mxGraphModel dx="1768" dy="971" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="3liIZrZXRfbUEaNn83K1-57" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#bdbdbd;fontSize=18;fontWeight=bold;align=center;verticalAlign=middle;" value="SwiftChat 即时通信系统技术架构" vertex="1">
+          <mxGeometry height="50" width="1100" x="590" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-58" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#a5d6a7;fontSize=14;fontWeight=bold;align=center;verticalAlign=middle;" value="表现层" vertex="1">
+          <mxGeometry height="80" width="120" x="590" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-59" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#a5d6a7;opacity=50;" value="" vertex="1">
+          <mxGeometry height="80" width="960" x="730" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-60" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Electron" vertex="1">
+          <mxGeometry height="50" width="150" x="760" y="585" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-61" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Vue 3" vertex="1">
+          <mxGeometry height="50" width="150" x="930" y="585" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-62" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Pinia" vertex="1">
+          <mxGeometry height="50" width="150" x="1100" y="585" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-63" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Element Plus" vertex="1">
+          <mxGeometry height="50" width="150" x="1270" y="585" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-64" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="sqlite3" vertex="1">
+          <mxGeometry height="50" width="150" x="1440" y="585" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-65" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#b0bec5;strokeColor=#90a4ae;fontSize=14;fontWeight=bold;align=center;verticalAlign=middle;" value="通信层" vertex="1">
+          <mxGeometry height="80" width="120" x="590" y="670" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-66" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#b0bec5;strokeColor=#90a4ae;opacity=50;" value="" vertex="1">
+          <mxGeometry height="80" width="960" x="730" y="670" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-67" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="HTTP(s)" vertex="1">
+          <mxGeometry height="50" width="150" x="760" y="685" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-68" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="WebSocket" vertex="1">
+          <mxGeometry height="50" width="150" x="930" y="685" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-69" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Axios" vertex="1">
+          <mxGeometry height="50" width="150" x="1100" y="685" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-70" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Netty" vertex="1">
+          <mxGeometry height="50" width="150" x="1270" y="685" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-71" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="IPC" vertex="1">
+          <mxGeometry height="50" width="150" x="1440" y="685" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-72" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#ffcc80;fontSize=14;fontWeight=bold;align=center;verticalAlign=middle;" value="业务层" vertex="1">
+          <mxGeometry height="80" width="120" x="590" y="770" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-73" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#ffcc80;opacity=50;" value="" vertex="1">
+          <mxGeometry height="80" width="960" x="730" y="770" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-74" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Spring Boot 2.6.13" vertex="1">
+          <mxGeometry height="50" width="180" x="760" y="785" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-75" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="MyBatis-Plus" vertex="1">
+          <mxGeometry height="50" width="180" x="960" y="785" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-76" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Redisson" vertex="1">
+          <mxGeometry height="50" width="180" x="1160" y="785" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-77" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="ws" vertex="1">
+          <mxGeometry height="50" width="180" x="1360" y="785" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-78" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#90caf9;fontSize=14;fontWeight=bold;align=center;verticalAlign=middle;" value="数据支撑层" vertex="1">
+          <mxGeometry height="80" width="120" x="590" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-79" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#90caf9;opacity=50;" value="" vertex="1">
+          <mxGeometry height="80" width="960" x="730" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-80" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="MySQL" vertex="1">
+          <mxGeometry height="50" width="180" x="820" y="885" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-81" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Redis" vertex="1">
+          <mxGeometry height="50" width="180" x="1020" y="885" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-82" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="SQLite" vertex="1">
+          <mxGeometry height="50" width="180" x="1220" y="885" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-83" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#bdbdbd;fontSize=14;fontWeight=bold;align=center;verticalAlign=middle;" value="基础设施层" vertex="1">
+          <mxGeometry height="80" width="120" x="590" y="970" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-84" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#bdbdbd;opacity=50;" value="" vertex="1">
+          <mxGeometry height="80" width="960" x="730" y="970" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-85" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Maven" vertex="1">
+          <mxGeometry height="50" width="150" x="760" y="985" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-86" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Git" vertex="1">
+          <mxGeometry height="50" width="150" x="930" y="985" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-87" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Docker" vertex="1">
+          <mxGeometry height="50" width="150" x="1100" y="985" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-88" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Linux" vertex="1">
+          <mxGeometry height="50" width="150" x="1270" y="985" as="geometry" />
+        </mxCell>
+        <mxCell id="3liIZrZXRfbUEaNn83K1-89" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#bdbdbd;align=center;verticalAlign=middle;" value="Nginx" vertex="1">
+          <mxGeometry height="50" width="150" x="1440" y="985" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
