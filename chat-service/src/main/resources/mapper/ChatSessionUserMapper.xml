@@ -44,6 +44,10 @@
         where contact_id = #{contactId}
     </update>
 
+    <select id="selectContactUserIds" resultType="java.lang.String">
+        select user_id from chat_session_user where contact_id = #{contactId}
+    </select>
+
     <delete id="deleteBatch" parameterType="map">
         DELETE FROM chat_session_user
         WHERE contact_id = #{contactId}

@@ -220,13 +220,29 @@ public class UserInfoServiceImpl implements UserInfoService {
 
         /*2、修改联系人的昵称 & 会话昵称*/
         if (userInfo.getNickName() != null) {
-            /*修改联系人的昵称*/
+            /*修改联系人表中所有持有该用户的备注名称*/
             userContactMapper.updateContactRemarks(userInfo.getUserId(), userInfo.getNickName());
-            /*会话昵称*/
+            /*修改所有把该用户当联系人的会话显示名称*/
             chatSessionUserMapper.updateName(userInfo.getNickName(), userInfo.getUserId());
+
+            /*3、向在线好友推送名称更新消息，不在线的用户上线后通过 INIT 自动同步*/
+            List<String> friendUserIds = chatSessionUserMapper.selectContactUserIds(userInfo.getUserId());
+            for (String friendUserId : friendUserIds) {
+                // 自己的会话（userId == contactId）不需要通知
+                if (friendUserId.equals(userInfo.getUserId())) {
+                    continue;
+                }
+                MessageSendDto<Object> sendDto = new MessageSendDto<>();
+                sendDto.setMessageType(MessageTypeEnum.USER_INFO_UPDATE.getType());
+                sendDto.setSendUserId(userInfo.getUserId());
+                sendDto.setContactName(userInfo.getNickName());
+                sendDto.setRecipientId(friendUserId);
+                sendDto.setRecipientType(UserContactTypeEnum.USER.getType());
+                messageHandler.sendMessage(sendDto);
+            }
         }
 
-        /*3、保存头像*/
+        /*4、保存头像*/
         if (avatarFile == null) {
             return ResultVo.success("修改成功");
         }

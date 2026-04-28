@@ -49,6 +49,7 @@
 		<!-- 标题 -->
 		<template #right-drag>
 			<div v-if="currentChatSession" class="title">
+				<!-- 单聊群聊标题 -->
 				<div class="title-name">
 					{{ currentChatSession.contactName }}
 					{{
@@ -123,6 +124,7 @@
 					<MessageSend
 						:current-chat-session="currentChatSession"
 						@send-message-local="sendMessageLocalHandler"
+						@start-video-call="startVideoCall"
 					></MessageSend>
 				</div>
 			</template>
@@ -378,37 +380,35 @@
 	};
 
 	const pendingContactId = ref(null); // 保存待处理的contactId
+
+	const getSessionKey = (session) => {
+		return `${session.sessionId}_${session.userId}`;
+	};
 	/**
 	 * 接收初始化会话列表
 	 */
 	const onLocalSessionDataCallback = () => {
 		window.ipcRenderer.on("localSessionDataCallback", (e, sessionList) => {
-			// 使用Map合并数据，新数据覆盖旧数据
+			// 会话列表在“初始化刷新”和“收到新消息”时都必须使用同一主键，避免昵称头像串到别的会话
 			const sessionMap = new Map();
 
-			// 先添加现有会话
 			chatSessionList.value.forEach((session) => {
-				sessionMap.set(session.sessionId, session);
+				sessionMap.set(getSessionKey(session), session);
 			});
 
-			// 再添加新会话（会覆盖同ID的旧会话）
 			sessionList.forEach((session) => {
-				sessionMap.set(session.sessionId, session);
+				sessionMap.set(getSessionKey(session), session);
 			});
 
-			// 转回数组并赋值
 			chatSessionList.value = Array.from(sessionMap.values());
 
-			// 会话排序（注意：这里应该对合并后的数据排序）
 			sortUserSession(chatSessionList.value);
 
-			// 统计未读数
 			const totalNoRead = chatSessionList.value.reduce((sum, item) => {
 				return sum + (item.noReadCount || 0);
 			}, 0);
 			messageCountStore.setCount("chatCount", totalNoRead, true);
 
-			// 处理待处理的路由请求
 			if (pendingContactId.value) {
 				toSendMessage(pendingContactId.value);
 				pendingContactId.value = null;
@@ -502,6 +502,17 @@
 			//  跟新群昵称
 			if (message.messageType == 10) {
 				avatarUpdateStore.triggerUpdate(message.recipientId);
+			}
+
+			// 好友改名：更新会话列表中该联系人的显示名称，并刷新联系人 store
+			if (message.messageType == 16) {
+				chatSessionList.value.forEach((session) => {
+					if (session.contactId === message.sendUserId) {
+						session.contactName = message.contactName;
+					}
+				});
+				contactStore.selectUserList(userInfo.value.userId);
+				return;
 			}
 
 			const session = message.extendData;
@@ -677,6 +688,23 @@
 		});
 	});
 
+	// 发起视频通话
+	const startVideoCall = () => {
+		window.ipcRenderer.send("newWindow", {
+			windowId: "videoChat",
+			title: "视频通话",
+			path: "/videoChat",
+			data: {
+				useId: userInfo.value.userId,
+				currentUserName: userInfo.value.nickName, // 传入本人昵称，供视频窗口本地占位符使用
+				recipient: currentChatSession.value.contactId,
+				contactName: currentChatSession.value.contactName,
+				targetEmail: currentChatSession.value.contactId,
+				autoStart: true
+			}
+		});
+	};
+
 	// 群详情
 	const chatGropDetailRef = ref();
 	const showGroupDetail = (currentChatSession) => {
@@ -773,26 +801,27 @@
 		}
 	}
 
-	.title {
-		position: relative;
-		width: 100%;
-		height: 100%;
-		display: flex;
-		align-items: center;
-		border-bottom: #e7e7e7 solid 1px;
-		.title-name {
-			height: 30px;
-			margin-left: 20px;
-			font-size: 20px;
-			font-weight: 550;
+		.title {
+			position: relative;
+			width: 100%;
+			height: 100%;
+			display: flex;
+			align-items: center;
+			border-bottom: #e7e7e7 solid 1px;
+			.title-name {
+				height: 30px;
+				margin-left: 20px;
+				font-size: 20px;
+				font-weight: 550;
+			}
+			.iconfont {
+				position: absolute;
+				right: 10px;
+				bottom: 10px;
+				opacity: 0.8;
+			}
 		}
-		.iconfont {
-			position: absolute;
-			right: 10px;
-			bottom: 10px;
-			opacity: 0.8;
-		}
-	}
+
 
 	.scrollbar-message {
 		height: calc(100% - 130px);

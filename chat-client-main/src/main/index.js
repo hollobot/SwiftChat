@@ -29,6 +29,7 @@ import {
 	onMvFiles,
 	onCreateNewSession,
 	onGetAvatar,
+	onGetAvatarByUserId,
 	onGetEmailHistory,
 	onGetAppVersion,
 	onOpenUpdateUrl,
@@ -231,10 +232,10 @@ function createWindow() {
 	onMvFiles();
 	onCreateNewSession();
 	onGetAvatar();
+	onGetAvatarByUserId();
 	onGetEmailHistory();
 	onGetAppVersion();
 	onOpenUpdateUrl();
-	setupIpcHandlers();
 	setupIpcHandlers();
 	changeSessionContentName();
 	// HMR for renderer base on electron-vite cli.

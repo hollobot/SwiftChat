@@ -237,21 +237,21 @@ public class UserContactServiceImpl implements UserContactService {
         chatSessionMapper.insertOrUpdate(chatSession);
 
         List<ChatSessionUser> chatSessionUsers = new ArrayList<>();
-        //申请人
+        String applyName = userInfoMapper.selectNameById(applyUserId);
+        String receptionName = userInfoMapper.selectNameById(receptionId);
+        //申请人 —— 会话中看到的是接受人的名字
         ChatSessionUser applyChatSessionUser = new ChatSessionUser();
         applyChatSessionUser.setUserId(applyUserId);
         applyChatSessionUser.setContactId(receptionId);
         applyChatSessionUser.setSessionId(sessionId);
-        String applyName = userInfoMapper.selectNameById(applyUserId);
-        applyChatSessionUser.setContactName(applyName);
+        applyChatSessionUser.setContactName(receptionName);
         chatSessionUsers.add(applyChatSessionUser);
-        //接受人
+        //接受人 —— 会话中看到的是申请人的名字
         ChatSessionUser receptionChatSessionUser = new ChatSessionUser();
         receptionChatSessionUser.setUserId(receptionId);
         receptionChatSessionUser.setContactId(applyUserId);
         receptionChatSessionUser.setSessionId(sessionId);
-        String receptionName = userInfoMapper.selectNameById(receptionId);
-        receptionChatSessionUser.setContactName(receptionName);
+        receptionChatSessionUser.setContactName(applyName);
         chatSessionUsers.add(receptionChatSessionUser);
         // 批量插入用户会话
         chatSessionUserMapper.insertOrUpdateBatch(chatSessionUsers);

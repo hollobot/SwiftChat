@@ -67,6 +67,15 @@ public class WebSocketMessageService {
                     handleEndCallMessage(ctx, data);
                     break;
 
+                case "reject_call":
+                    handleRejectCallMessage(ctx, data);
+                    break;
+
+                case "camera_toggle":
+                    // 摄像头开关通知，直接透传给对方，让对方更新占位符显示状态
+                    handleCameraToggle(ctx, data);
+                    break;
+
                 case "heartbeat":
                 case "ping":
                     handleHeartbeatMessage(ctx, data);
@@ -154,6 +163,19 @@ public class WebSocketMessageService {
     }
 
     /**
+     * 处理拒绝通话消息
+     */
+    private void handleRejectCallMessage(ChannelHandlerContext ctx, PeerConnectionDataDto data) {
+        log.info("处理RejectCall消息: {} -> {}", data.getSendUserId(), data.getReceiveUserId());
+
+        // 转发拒绝通话消息
+        boolean success = forwardMessageToUser(data);
+        if (success) {
+            sendSuccessResponse(ctx, "reject_call", "通话拒绝消息已发送");
+        }
+    }
+
+    /**
      * 处理心跳消息
      */
     private void handleHeartbeatMessage(ChannelHandlerContext ctx, PeerConnectionDataDto data) {
@@ -196,6 +218,14 @@ public class WebSocketMessageService {
         log.info("处理通话响应: {} 响应 {} 的通话请求", data.getSendUserId(), data.getReceiveUserId());
 
         // 转发通话响应
+        forwardMessageToUser(data);
+    }
+
+    /**
+     * 处理摄像头开关通知，直接转发给对方
+     */
+    private void handleCameraToggle(ChannelHandlerContext ctx, PeerConnectionDataDto data) {
+        log.info("处理摄像头切换通知: {} -> {}, enabled={}", data.getSendUserId(), data.getReceiveUserId(), data.getSignalData());
         forwardMessageToUser(data);
     }
 

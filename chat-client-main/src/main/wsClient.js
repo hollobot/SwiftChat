@@ -140,13 +140,12 @@ const createWs = (token) => {
 					if (message.extendData && typeof message.extendData === "object") {
 						Object.assign(sessionInfo, message.extendData);
 					} else {
-						Object.assign(sessionInfo, message);
-						// 不是群聊需要跟新发送的用户名
-						if (message.recipientType == 0) {
-							sessionInfo.contactName = message.sendUserNickName;
-						}
-						sessionInfo.lastMessage = message.lastMessage;
-						sessionInfo.lastReceiveTime = message.sendTime;
+					Object.assign(sessionInfo, message);
+					if (message.recipientType == 0) {
+						sessionInfo.contactName = message.sendUserNickName;
+					}
+					sessionInfo.lastMessage = message.lastMessage;
+					sessionInfo.lastReceiveTime = message.sendTime;
 					}
 
 					// 退出加入群聊需要跟新群聊人数
@@ -195,23 +194,55 @@ const createWs = (token) => {
 					// 发送渲染进程渲染界面
 					sender.send("reciveMessage", message);
 					break;
-				case 15: // 视频通话
+				case 16: // 用户信息更新（好友改名）
+					// 更新本地 SQLite 中该联系人的会话显示名称
+					sender.send("updateSessionContentName", {
+						contactName: message.contactName,
+						contactId: message.sendUserId
+					});
+					// 通知渲染进程刷新会话列表中的联系人名称
+					sender.send("reciveMessage", message);
+					break;
+
+				case 15: // 视频通话（WebRTC 信令统一走此分支，messageType 由服务端注入）
 					let videoChatWindow = getWindowsMap("videoChat");
 
 					if (!videoChatWindow) {
-						// 创建窗口
-						await videoChat(message.receiveUserId, message.sendUserId);
+						// 只有 offer（来电）信令才需要打开新窗口；
+						// camera_toggle / answer / candidate 等在通话中产生，窗口必然存在，无需开窗
+						if (message.signalType !== "offer") {
+							break;
+						}
+
+						// PeerConnectionDataDto 无昵称字段，从本地会话表补全发送方昵称
+						const senderSession = await selectUserSessionByContactId(message.sendUserId);
+						const senderName = senderSession?.contactName || message.sendUserNickName;
+
+						// 来电时补全窗口初始化数据，避免页面缺少联系人信息
+						await videoChat(message.receiveUserId, message.sendUserId, {
+							contactName: senderName,
+							targetEmail: message.sendUserId,
+							// 传入接收方自身昵称，供视频窗口本地占位符使用
+							currentUserName: store.getUserData("userInfo")?.nickName
+						});
 						videoChatWindow = getWindowsMap("videoChat");
 						// 阻塞等待窗口初始化完成
 						await new Promise((resolve) => {
-							// 方式1: 等待DOM加载完成
 							setTimeout(resolve, 2000);
 						});
 
-						videoChatWindow.webContents.send("webrtc:signal-message", message);
+						videoChatWindow.webContents.send("webrtc:signal-message", {
+							...message,
+							sendUserNickName: senderName
+						});
 					} else {
-						// 直接发送消息
-						videoChatWindow.webContents.send("webrtc:signal-message", message);
+						// 窗口已存在，直接转发信令（携带补全后的昵称供 handleOffer 使用）
+						const senderSession = await selectUserSessionByContactId(message.sendUserId);
+						const senderName = senderSession?.contactName || message.sendUserNickName;
+						videoChatWindow.webContents.send("webrtc:signal-message", {
+							...message,
+							sendUserNickName: senderName
+						});
 					}
 					break;
 			}
@@ -303,6 +334,7 @@ export const closeWs = () => {
  */
 export const sendSignalMessage = (message) => {
 	if (!ws || ws.readyState !== WebSocket.OPEN) {
+		console.error("发送信令失败，WebSocket 未连接:", message.signalType, message);
 		sender.send("webrtc:connection-error", "WebSocket not connected");
 		return false;
 	}
@@ -311,9 +343,10 @@ export const sendSignalMessage = (message) => {
 		const messageString = JSON.stringify(message);
 		// 发送信令消息到服务器
 		ws.send(messageString);
-		console.log(`Signal message sent: ${message.signalType}`);
+		console.log(`Signal message sent: ${message.signalType}`, message);
 		return true;
 	} catch (error) {
+		console.error("发送信令异常:", message.signalType, error);
 		sender.send("webrtc:connection-error", "Failed to send signal message");
 		return false;
 	}
@@ -332,12 +365,16 @@ const updateConnectionStatus = (status) => {
 };
 
 // 打开视频聊天窗口
-const videoChat = async (useId, recipient) => {
+const videoChat = async (useId, recipient, extraData = {}) => {
 	const param = {
 		windowId: "videoChat",
 		title: "视频通话",
 		path: "/videoChat",
-		data: { useId, recipient }
+		data: {
+			useId,
+			recipient,
+			...extraData
+		}
 	};
 	await openWindow(param);
 };

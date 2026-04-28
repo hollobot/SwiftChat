@@ -1,50 +1,58 @@
 <template>
 	<div class="message-send">
-		<div class="topbar">
-			<el-popover
-				popper-class="expression"
-				placement="top"
-				width="400"
-				height="300"
-				trigger="click"
-				ref="visible"
-				:hide-after="0"
-			>
-				<template #reference>
-					<span @click="addClickEvent" class="iconfont icon-xiaolian"></span>
-				</template>
-				<template #default>
-					<el-tabs v-model="activeName">
-						<el-tab-pane
-							v-for="emojis in emojiList"
-							:label="emojis.category"
-							:name="emojis.category"
-							class="expression-tabs scroll-content"
-						>
-							<div
-								class="emoji-box"
-								v-for="emoji in emojis.emojis"
-								:title="emoji.name"
-								@click="hidePopover(emoji.emoji)"
+		<div class="tool-row">
+			<div class="topbar">
+				<el-popover
+					popper-class="expression"
+					placement="top"
+					width="400"
+					height="300"
+					trigger="click"
+					ref="visible"
+					:hide-after="0"
+				>
+					<template #reference>
+						<span @click="addClickEvent" class="iconfont icon-xiaolian"></span>
+					</template>
+					<template #default>
+						<el-tabs v-model="activeName">
+							<el-tab-pane
+								v-for="emojis in emojiList"
+								:label="emojis.category"
+								:name="emojis.category"
+								class="expression-tabs scroll-content"
 							>
-								{{ emoji.emoji }}
-							</div>
-						</el-tab-pane>
-					</el-tabs>
-				</template>
-			</el-popover>
+								<div
+									class="emoji-box"
+									v-for="emoji in emojis.emojis"
+									:title="emoji.name"
+									@click="hidePopover(emoji.emoji)"
+								>
+									{{ emoji.emoji }}
+								</div>
+							</el-tab-pane>
+						</el-tabs>
+					</template>
+				</el-popover>
 
-			<el-upload
-				class="upload-file"
-				ref="fileRef"
-				multiple
-				:show-file-list="false"
-				:limit="limit"
-				:http-request="uplocadFile"
-				:on-exceed="uploadExceed"
-			>
-				<div class="iconfont icon-wenjianjia"></div>
-			</el-upload>
+				<el-upload
+					class="upload-file"
+					ref="fileRef"
+					multiple
+					:show-file-list="false"
+					:limit="limit"
+					:http-request="uplocadFile"
+					:on-exceed="uploadExceed"
+				>
+					<div class="iconfont icon-wenjianjia"></div>
+				</el-upload>
+			</div>
+			<div
+				v-if="currentChatSession.contactType == 0"
+				class="video-call-entry iconfont icon-video"
+				title="视频通话"
+				@click="startVideoCall"
+			></div>
 		</div>
 		<el-input
 			v-model="messageContent"
@@ -91,7 +99,7 @@
 	// 用来获取客户上传文件的路径
 	const { webUtils } = require("electron");
 
-	const emit = defineEmits(["sendMessageLocal"]);
+	const emit = defineEmits(["sendMessageLocal", "startVideoCall"]);
 
 	const { userInfo } = storeToRefs(userInfoStore);
 
@@ -344,6 +352,11 @@
 		}
 	};
 
+	const startVideoCall = () => {
+		// 单聊时从输入区右上角发起视频通话
+		emit("startVideoCall");
+	};
+
 	onMounted(() => {
 		window.ipcRenderer.on("saveMemoryFileToLocalCallback", (e, data) => {
 			const { messageContent, size, fileName, savePath } = data;
@@ -388,23 +401,41 @@
 		}
 	}
 	.message-send {
-		.topbar {
+		.tool-row {
 			margin: 10px 20px 5px 20px;
-			height: 20px;
 			display: flex;
-			.iconfont {
-				width: 20px;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+			.topbar {
 				height: 20px;
-				opacity: 0.8;
-				cursor: pointer; /* 鼠标悬停时显示手指形状 */
-			}
-			.icon-xiaolian {
-				margin-right: 15px;
+				display: flex;
+				align-items: center;
+				.iconfont {
+					width: 20px;
+					height: 20px;
+					opacity: 0.8;
+					cursor: pointer;
+				}
+				.icon-xiaolian {
+					margin-right: 15px;
+				}
+
+				.upload-file {
+					.iconfont {
+						color: black;
+					}
+				}
 			}
 
-			.upload-file {
-				.iconfont {
-					color: black;
+			.video-call-entry {
+				font-size: 18px;
+				color: #606266;
+				cursor: pointer;
+				transition: color 0.2s ease, opacity 0.2s ease;
+				&:hover {
+					color: #07c160;
+					opacity: 1;
 				}
 			}
 		}

@@ -2,6 +2,7 @@ import { ipcMain, BrowserWindow, dialog, shell } from "electron";
 import fs from "fs-extra";
 const pkg = require("../../package.json");
 import { is } from "@electron-toolkit/utils";
+import icon from "../../resources/icon.png?asset";
 import store from "./store";
 import { initWs, sendSignalMessage, startSignalServer } from "./wsClient";
 const path = require("path");
@@ -173,6 +174,7 @@ export const openWindow = async ({
 			autoHideMenuBar: true, // 是否隐藏菜单栏
 			titleBarStyle: "hidden",
 			maximizable: false,
+			icon, // 与主窗口保持一致的图标
 			webPreferences: {
 				preload: join(__dirname, "../preload/index.js"),
 				sandbox: false,
@@ -239,6 +241,8 @@ export const openWindow = async ({
 		}
 		// 聚焦窗口
 		newWindow.focus();
+		// 复用视频通话窗口时，也要同步最新的页面初始化数据
+		newWindow.webContents.send("pageInitData", data);
 	}
 };
 
@@ -393,6 +397,27 @@ export const onGetAvatar = () => {
 			return `data:image/jpeg;base64,${imageBase64}`;
 		} catch (error) {
 			console.error("获取头像失败:", error);
+			return null;
+		}
+	});
+};
+
+/** 通过 userId 读取本地头像（用于已登录过本机的用户，如视频通话本地小窗） */
+export const onGetAvatarByUserId = () => {
+	ipcMain.handle("getAvatarByUserId", async (e, userId) => {
+		try {
+			const data = await selectSettingInfoByUserID(userId);
+			if (!data) return null;
+			const avatarPath = path.join(
+				JSON.parse(data.sysSetting).localFileFolder,
+				`${userId}\\avatar`,
+				`\\${userId}.jpg`
+			);
+			if (!fs.existsSync(avatarPath)) return null;
+			const imageBuffer = fs.readFileSync(avatarPath);
+			return `data:image/jpeg;base64,${imageBuffer.toString("base64")}`;
+		} catch (error) {
+			console.error("按userId获取头像失败:", error);
 			return null;
 		}
 	});
