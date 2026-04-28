@@ -30,8 +30,8 @@ let sender = null;
 let needReconnect = null;
 let heartbeatInterval = null; // 用来保存发送心跳定时器ID
 
-// 连接状态 默认未连接
-const connectionStatus = "disconnected";
+// 连接状态 默认未连接（必须用 let，updateConnectionStatus 内会重新赋值）
+let connectionStatus = "disconnected";
 
 export const initWs = (userInfo, _sender) => {
 	wsUrl =

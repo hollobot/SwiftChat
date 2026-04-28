@@ -79,6 +79,8 @@
 	// WebRTC相关变量
 	let localStream = null; // 本地媒体流
 	let peer = null; // RTCPeerConnection实例
+	// 在远程描述设置完成前到达的ICE候选缓冲区
+	let pendingIceCandidates = [];
 
 	// ICE服务器配置-用于NAT穿透
 	const ICE_SERVERS = [
@@ -135,6 +137,9 @@
 			peer.close();
 			peer = null;
 		}
+
+		// 新建连接时清空ICE缓冲区，旧会话的候选不应用于新连接
+		pendingIceCandidates = [];
 
 		// 创建新的 P2P 连接
 		// 使用增强的配置创建P2P连接
@@ -197,16 +202,19 @@
 	// 获取本地媒体流 （摄像头和麦克风）
 	async function getLocalMedia() {
 		try {
-			// 如果已有媒体流，先停止所有轨道
+			// 先申请新流，成功后再停止旧流
+			// 避免先stop再申请失败时，localStream指向已停止的死轨道
+			const newStream = await navigator.mediaDevices.getUserMedia({
+				video: true,
+				audio: true
+			});
+
+			// 获取新流成功，安全地停止旧轨道
 			if (localStream) {
 				localStream.getTracks().forEach((track) => track.stop());
 			}
 
-			// 请求用户媒体权限并获取流
-			localStream = await navigator.mediaDevices.getUserMedia({
-				video: true,
-				audio: true
-			});
+			localStream = newStream;
 
 			// 将本地流显示在视频元素中
 			if (localVideo.value) {
@@ -217,6 +225,7 @@
 			return true;
 		} catch (error) {
 			addLog(`获取媒体流失败: ${error.message}`);
+			// 不清空 localStream，保留上次可用的流
 			return false;
 		}
 	}
@@ -379,8 +388,14 @@
 			// 更新目标用户ID为呼叫方
 			targetUserId.value = sendUserId;
 
-			// **关键修复1: 被叫方也需要先获取媒体流**
-			await getLocalMedia();
+			// onMounted 已经获取过媒体流并显示预览；只有在没有可用视频轨道时才重新获取。
+			// 避免重复打开摄像头：先 stop 旧轨道再申请，若申请失败则本地预览变黑，
+			// 同时被加入 peer 的是死轨道，导致对端收不到视频。
+			const hasLiveVideo =
+				localStream && localStream.getVideoTracks().some((t) => t.readyState === "live");
+			if (!hasLiveVideo) {
+				await getLocalMedia();
+			}
 
 			// **关键修复1: 确保清理旧的peer连接**
 			if (peer && peer.connectionState !== "closed") {
@@ -409,6 +424,9 @@
 			// 设置远程描述
 			await peer.setRemoteDescription(new RTCSessionDescription(offer));
 			addLog(`设置远程描述后的状态: ${peer.signalingState}`);
+
+			// 远程描述已就绪，立即应用此前缓冲的ICE候选
+			await flushPendingCandidates();
 
 			// 创建并设置本地应答
 			const answer = await peer.createAnswer();
@@ -501,6 +519,8 @@
 			}
 
 			await peer.setRemoteDescription(new RTCSessionDescription(answer));
+			// 远程描述已就绪，立即应用此前缓冲的ICE候选
+			await flushPendingCandidates();
 			addLog(`远程应答描述设置成功，新状态: ${peer.signalingState}`);
 		} catch (error) {
 			addLog(`处理answer失败: ${error.message}`);
@@ -515,19 +535,33 @@
 		}
 	}
 
-	// 处理ICE候选
+	// 处理ICE候选：peer未就绪或远程描述未设置时先缓冲，等时机成熟再统一应用
 	async function handleCandidate(candidate) {
 		try {
-			if (!peer) {
-				addLog("无效的peer连接");
+			if (!peer || !peer.remoteDescription) {
+				// 远程描述尚未设置，addIceCandidate会失败，先放入缓冲区
+				pendingIceCandidates.push(candidate);
+				addLog("ICE候选已缓冲（等待远程描述就绪）");
 				return;
 			}
-
-			// 添加 ICE 候选到 P2P 连接
 			await peer.addIceCandidate(new RTCIceCandidate(candidate));
 			addLog("添加ICE候选成功");
 		} catch (error) {
 			addLog(`添加ICE候选失败: ${error.message}`);
+		}
+	}
+
+	// 将缓冲区中积压的ICE候选全部应用到当前peer连接
+	// 在setRemoteDescription成功后立即调用
+	async function flushPendingCandidates() {
+		if (!peer || pendingIceCandidates.length === 0) return;
+		addLog(`应用 ${pendingIceCandidates.length} 个缓冲ICE候选`);
+		for (const c of pendingIceCandidates.splice(0)) {
+			try {
+				await peer.addIceCandidate(new RTCIceCandidate(c));
+			} catch (e) {
+				addLog(`应用缓冲ICE候选失败: ${e.message}`);
+			}
 		}
 	}
 
