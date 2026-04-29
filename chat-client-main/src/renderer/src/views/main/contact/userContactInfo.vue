@@ -239,18 +239,19 @@
 	/**
 	 * 视频聊天
 	 */
-	const videoChat = () =>{
-		const params = {
-			useId:userInfo.value.userId,
-			recipient:userContactInfo.value.userId
-		}
-
-		// TODO 发送添加视频窗口到主进程
+	const videoChat = () => {
 		window.ipcRenderer.send("newWindow", {
 			windowId: "videoChat",
 			title: "视频通话",
 			path: "/videoChat",
-			data: params
+			data: {
+				useId: userInfo.value.userId,
+				currentUserName: userInfo.value.nickName,
+				recipient: userContactInfo.value.userId,
+				contactName: userContactInfo.value.nickName,
+				targetEmail: userContactInfo.value.userId,
+				autoStart: true
+			}
 		});
 	}
 </script>

@@ -116,6 +116,7 @@
 	const targetUserId = ref("");
 	const logs = ref([]);
 	const isInCall = ref(false);
+	const answerReceived = ref(false); // 对方已接听但流尚未建立
 	const incomingCallVisible = ref(false);
 	const pendingOffer = ref(null);
 	const videoEnabled = ref(true);
@@ -191,6 +192,9 @@
 	const controlHint = computed(() => {
 		if (hasRemoteStream.value) {
 			return "你们已经连线成功，可以继续通话";
+		}
+		if (answerReceived.value) {
+			return "对方已接听，正在建立连接...";
 		}
 		if (isInCall.value) {
 			return "正在呼叫中，请保持窗口开启";
@@ -385,6 +389,7 @@
 
 		try {
 			isInCall.value = false;
+			answerReceived.value = false;
 
 			// onMounted 已获取预览流，若轨道仍存活则直接复用，避免重复打开摄像头
 			const hasLiveVideo =
@@ -647,6 +652,7 @@
 			await peer.setRemoteDescription(new RTCSessionDescription(answer));
 			// 远程描述就绪，立即应用此前缓冲的ICE候选
 			await flushPendingCandidates();
+			answerReceived.value = true; // 对方已接听，进入连接中间态
 			addLog(`远程应答描述设置成功，新状态: ${peer.signalingState}`);
 		} catch (error) {
 			addLog(`处理answer失败: ${error.message}`);
@@ -689,8 +695,9 @@
 
 	async function handleRejectCall() {
 		addLog("对方已拒绝通话");
-		ElMessage({ message: "对方已拒绝", type: "warning" });
-		await endCall(false);
+		ElMessage({ message: "对方已拒绝通话", type: "warning", duration: 2000 });
+		// 延迟2秒关窗，确保用户能看清提示
+		await endCall(false, 2000);
 	}
 
 	async function handleEndCall() {
@@ -698,12 +705,14 @@
 		await endCall(false);
 	}
 
-	async function endCall(sendSignal = true) {
+	// closeDelay: 关窗前的延迟毫秒数，用于拒绝场景让用户看清提示
+	async function endCall(sendSignal = true, closeDelay = 0) {
 		if (sendSignal && isInCall.value) {
 			sendSignalMessage("end_call", {});
 		}
 
 		isInCall.value = false;
+		answerReceived.value = false;
 		incomingCallVisible.value = false;
 		pendingOffer.value = null;
 		hasRemoteStream.value = false;
@@ -720,6 +729,9 @@
 		}
 
 		addLog("通话已结束");
+		if (closeDelay > 0) {
+			await new Promise((resolve) => setTimeout(resolve, closeDelay));
+		}
 		window.ipcRenderer.send("sendWinControl", { action: "close", type: 0 });
 	}
 
