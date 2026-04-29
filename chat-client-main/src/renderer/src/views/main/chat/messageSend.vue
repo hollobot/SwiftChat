@@ -47,12 +47,19 @@
 					<div class="iconfont icon-wenjianjia"></div>
 				</el-upload>
 			</div>
-			<div
-				v-if="currentChatSession.contactType == 0"
-				class="video-call-entry iconfont icon-video"
-				title="视频通话"
-				@click="startVideoCall"
-			></div>
+			<!-- 单聊时右侧展示语音和视频通话入口 -->
+			<div v-if="currentChatSession.contactType == 0" class="call-actions">
+				<div
+					class="video-call-entry iconfont icon-dianhua3"
+					title="语音通话"
+					@click="startVoiceCall"
+				></div>
+				<div
+					class="video-call-entry iconfont icon-video"
+					title="视频通话"
+					@click="startVideoCall"
+				></div>
+			</div>
 		</div>
 		<el-input
 			v-model="messageContent"
@@ -99,7 +106,7 @@
 	// 用来获取客户上传文件的路径
 	const { webUtils } = require("electron");
 
-	const emit = defineEmits(["sendMessageLocal", "startVideoCall"]);
+	const emit = defineEmits(["sendMessageLocal", "startVideoCall", "startVoiceCall"]);
 
 	const { userInfo } = storeToRefs(userInfoStore);
 
@@ -353,8 +360,11 @@
 	};
 
 	const startVideoCall = () => {
-		// 单聊时从输入区右上角发起视频通话
 		emit("startVideoCall");
+	};
+
+	const startVoiceCall = () => {
+		emit("startVoiceCall");
 	};
 
 	onMounted(() => {
@@ -426,6 +436,14 @@
 						color: black;
 					}
 				}
+			}
+
+			/* 右侧通话按钮组，两个图标紧贴在一起 */
+			.call-actions {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				margin-left: auto; // 推到最右侧
 			}
 
 			.video-call-entry {

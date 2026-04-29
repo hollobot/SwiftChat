@@ -125,6 +125,7 @@
 						:current-chat-session="currentChatSession"
 						@send-message-local="sendMessageLocalHandler"
 						@start-video-call="startVideoCall"
+					@start-voice-call="startVoiceCall"
 					></MessageSend>
 				</div>
 			</template>
@@ -696,7 +697,24 @@
 			path: "/videoChat",
 			data: {
 				useId: userInfo.value.userId,
-				currentUserName: userInfo.value.nickName, // 传入本人昵称，供视频窗口本地占位符使用
+				currentUserName: userInfo.value.nickName,
+				recipient: currentChatSession.value.contactId,
+				contactName: currentChatSession.value.contactName,
+				targetEmail: currentChatSession.value.contactId,
+				autoStart: true
+			}
+		});
+	};
+
+	// 发起语音通话
+	const startVoiceCall = () => {
+		window.ipcRenderer.send("newWindow", {
+			windowId: "voiceChat",
+			title: "语音通话",
+			path: "/voiceChat",
+			data: {
+				useId: userInfo.value.userId,
+				currentUserName: userInfo.value.nickName,
 				recipient: currentChatSession.value.contactId,
 				contactName: currentChatSession.value.contactName,
 				targetEmail: currentChatSession.value.contactId,

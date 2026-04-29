@@ -98,9 +98,9 @@
 				<span class="iconfont icon-weixinxinxi1"></span>
 				<span class="text">发消息</span>
 			</div>
-			<div class="icon">
+			<div class="icon" @click="voiceChat">
 				<span class="iconfont icon-dianhua3"></span>
-				<span class="text">语言聊天</span>
+				<span class="text">语音通话</span>
 			</div>
 			<div class="icon" @click="videoChat">
 				<span class="iconfont icon-video"></span>
@@ -244,6 +244,25 @@
 			windowId: "videoChat",
 			title: "视频通话",
 			path: "/videoChat",
+			data: {
+				useId: userInfo.value.userId,
+				currentUserName: userInfo.value.nickName,
+				recipient: userContactInfo.value.userId,
+				contactName: userContactInfo.value.nickName,
+				targetEmail: userContactInfo.value.userId,
+				autoStart: true
+			}
+		});
+	};
+
+	/**
+	 * 语音通话
+	 */
+	const voiceChat = () => {
+		window.ipcRenderer.send("newWindow", {
+			windowId: "voiceChat",
+			title: "语音通话",
+			path: "/voiceChat",
 			data: {
 				useId: userInfo.value.userId,
 				currentUserName: userInfo.value.nickName,

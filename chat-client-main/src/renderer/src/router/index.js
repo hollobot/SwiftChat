@@ -140,6 +140,11 @@ const routes = [
 		path: "/videoChat",
 		name: "videoChat",
 		component: () => import("@/views/videoChat/videoChat.vue")
+	},
+	{
+		path: "/voiceChat",
+		name: "voiceChat",
+		component: () => import("@/views/voiceChat/voiceChat.vue")
 	}
 ];
 

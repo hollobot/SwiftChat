@@ -116,7 +116,8 @@
 	const targetUserId = ref("");
 	const logs = ref([]);
 	const isInCall = ref(false);
-	const answerReceived = ref(false); // 对方已接听但流尚未建立
+	const answerReceived = ref(false); // 对方已接听但 P2P 尚未 connected
+	const isConnected = ref(false); // P2P 连接已成功建立（connectionState === "connected"）
 	const incomingCallVisible = ref(false);
 	const pendingOffer = ref(null);
 	const videoEnabled = ref(true);
@@ -177,28 +178,17 @@
 	});
 
 	const callStatusText = computed(() => {
-		if (incomingCallVisible.value) {
-			return "等待你选择接听或拒绝";
-		}
-		if (hasRemoteStream.value) {
-			return "通话已建立，当前网络正常";
-		}
-		if (isInCall.value) {
-			return "正在等待对方接听视频邀请";
-		}
-		return "点击后将通过摄像头发起面对面聊天";
+		if (incomingCallVisible.value) return "等待你选择接听或拒绝";
+		if (isConnected.value) return "通话已建立，当前网络正常";
+		if (isInCall.value) return "正在等待对方接听...";
+		return "准备发起视频通话";
 	});
 
 	const controlHint = computed(() => {
-		if (hasRemoteStream.value) {
-			return "你们已经连线成功，可以继续通话";
-		}
-		if (answerReceived.value) {
-			return "对方已接听，正在建立连接...";
-		}
-		if (isInCall.value) {
-			return "正在呼叫中，请保持窗口开启";
-		}
+		// 以 P2P 连接状态（而非视频流是否到达）作为"已接通"判断依据，避免流延迟导致提示滞后
+		if (isConnected.value) return "你们已经连线成功，可以继续通话";
+		if (answerReceived.value) return "对方已接听，正在建立连接...";
+		if (isInCall.value) return "正在呼叫中，请保持窗口开启";
 		return "准备发起通话";
 	});
 
@@ -335,10 +325,14 @@
 			addLog(`P2P连接状态变化: ${peer.connectionState}`);
 			if (peer.connectionState === "connected") {
 				addLog("P2P连接建立成功！");
+				isConnected.value = true;  // 连接成功，切换提示为"已连线"
+				answerReceived.value = false; // 清除中间态
 			} else if (peer.connectionState === "failed") {
 				addLog("P2P连接失败，尝试重新连接");
+				isConnected.value = false;
 			} else if (peer.connectionState === "disconnected") {
 				addLog("P2P连接断开");
+				isConnected.value = false;
 				endCall(false);
 			}
 		};
@@ -353,30 +347,46 @@
 	}
 
 	async function getLocalMedia() {
+		let newStream = null;
+		let videoAvailable = true;
+
 		try {
 			// 先申请新流，成功后再停止旧流，避免申请失败时留下死轨道
-			const newStream = await navigator.mediaDevices.getUserMedia({
-				video: true,
-				audio: true
-			});
-			if (localStream) {
-				localStream.getTracks().forEach((track) => track.stop());
+			newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+		} catch (err) {
+			addLog(`视频+音频获取失败(${err.message})，尝试仅获取音频`);
+			videoAvailable = false;
+			try {
+				// 降级：没有摄像头或摄像头被占用时，至少保留麦克风，确保接收方能发送声音
+				newStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+			} catch (audioErr) {
+				addLog(`音频获取也失败: ${audioErr.message}`);
+				return false;
 			}
-			localStream = newStream;
-			if (localVideo.value) {
-				localVideo.value.srcObject = localStream;
-			}
-			// 初始化本地预览后，同步小窗占位状态
-			const hasLive =
-				localStream?.getVideoTracks?.().some((track) => track.enabled && track.readyState === "live") || false;
-			videoEnabled.value = hasLive;
-			localVideoReady.value = hasLive; // 触发 showLocalPlaceholder 重新计算
-			addLog("获取本地媒体流成功");
-			return true;
-		} catch (error) {
-			addLog(`获取媒体流失败: ${error.message}`);
-			return false;
 		}
+
+		// 停止旧流（在新流就绪后再停止，避免中间空档）
+		if (localStream) {
+			localStream.getTracks().forEach((track) => track.stop());
+		}
+		localStream = newStream;
+
+		if (localVideo.value && videoAvailable) {
+			localVideo.value.srcObject = localStream;
+		}
+
+		// 同步视频状态
+		const hasLive =
+			localStream?.getVideoTracks?.().some((track) => track.enabled && track.readyState === "live") || false;
+		videoEnabled.value = hasLive;
+		localVideoReady.value = hasLive;
+
+		// 同步音频状态：新流的音频轨默认开启，确保与 UI 一致
+		const hasAudio = localStream?.getAudioTracks?.().some((t) => t.readyState === "live") || false;
+		audioEnabled.value = hasAudio;
+
+		addLog(`获取本地媒体流成功（视频: ${videoAvailable}, 音频: ${hasAudio}）`);
+		return true;
 	}
 
 	async function startCall() {
@@ -391,10 +401,9 @@
 			isInCall.value = false;
 			answerReceived.value = false;
 
-			// onMounted 已获取预览流，若轨道仍存活则直接复用，避免重复打开摄像头
-			const hasLiveVideo =
-				localStream && localStream.getVideoTracks().some((t) => t.readyState === "live");
-			if (!hasLiveVideo) {
+			// 若任意轨道仍存活则直接复用，否则重新获取（同时处理无摄像头的降级场景）
+			const hasLiveMedia = localStream && localStream.getTracks().some((t) => t.readyState === "live");
+			if (!hasLiveMedia) {
 				const mediaOk = await getLocalMedia();
 				if (!mediaOk) {
 					addLog("获取媒体流失败，无法发起呼叫");
@@ -554,9 +563,9 @@
 		}
 		incomingCallVisible.value = false;
 		try {
-			const hasLiveVideo =
-				localStream && localStream.getVideoTracks().some((t) => t.readyState === "live");
-			if (!hasLiveVideo) {
+			// 检查任意有效轨道是否存在（包括纯音频降级场景），只要有 live 轨道就复用，否则重新获取
+			const hasLiveMedia = localStream && localStream.getTracks().some((t) => t.readyState === "live");
+			if (!hasLiveMedia) {
 				await getLocalMedia();
 			}
 
@@ -713,6 +722,7 @@
 
 		isInCall.value = false;
 		answerReceived.value = false;
+		isConnected.value = false; // 重置连接状态
 		incomingCallVisible.value = false;
 		pendingOffer.value = null;
 		hasRemoteStream.value = false;

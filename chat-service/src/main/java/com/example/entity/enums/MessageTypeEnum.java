@@ -18,7 +18,8 @@ public enum MessageTypeEnum {
     ADD_FRIEND_THIS(13, "", "添加好友打招呼消息"),
     CONTACT_GROUP_APPLY(14, "", "群聊申请"),
     VIDEO_CALL(15, "", "视频通话"),
-    USER_INFO_UPDATE(16, "", "用户信息更新");
+    USER_INFO_UPDATE(16, "", "用户信息更新"),
+    VOICE_CALL(17, "", "语音通话");
 
 
     private Integer type;

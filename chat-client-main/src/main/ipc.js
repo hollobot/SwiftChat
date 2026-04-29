@@ -243,6 +243,14 @@ export const openWindow = async ({
 		newWindow.focus();
 		// 复用视频通话窗口时，也要同步最新的页面初始化数据
 		newWindow.webContents.send("pageInitData", data);
+	} else if (windowId === "voiceChat") {
+		// 复用语音通话窗口时同步初始化数据
+		newWindow.show();
+		if (newWindow.isMinimized()) {
+			newWindow.restore();
+		}
+		newWindow.focus();
+		newWindow.webContents.send("pageInitData", data);
 	}
 };
 
@@ -466,8 +474,12 @@ export const onOpenUpdateUrl = () => {
  * 设置 IPC 事件处理器
  */
 export const setupIpcHandlers = () => {
-	// 处理发送信令消息请求
+	// 处理视频通话信令发送请求
 	ipcMain.on("webrtc:send-signal", (event, message) => {
+		sendSignalMessage(message);
+	});
+	// 处理语音通话信令发送请求（复用同一 WebSocket 连接）
+	ipcMain.on("voicertc:send-signal", (event, message) => {
 		sendSignalMessage(message);
 	});
 };

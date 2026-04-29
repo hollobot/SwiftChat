@@ -204,29 +204,24 @@ const createWs = (token) => {
 					sender.send("reciveMessage", message);
 					break;
 
-				case 15: // 视频通话（WebRTC 信令统一走此分支，messageType 由服务端注入）
+				case 15: // 视频通话信令（messageType=15）
 					let videoChatWindow = getWindowsMap("videoChat");
 
 					if (!videoChatWindow) {
-						// 只有 offer（来电）信令才需要打开新窗口；
-						// camera_toggle / answer / candidate 等在通话中产生，窗口必然存在，无需开窗
+						// 只有 offer（来电）才需要打开新窗口
 						if (message.signalType !== "offer") {
 							break;
 						}
 
-						// PeerConnectionDataDto 无昵称字段，从本地会话表补全发送方昵称
 						const senderSession = await selectUserSessionByContactId(message.sendUserId);
 						const senderName = senderSession?.contactName || message.sendUserNickName;
 
-						// 来电时补全窗口初始化数据，避免页面缺少联系人信息
 						await videoChat(message.receiveUserId, message.sendUserId, {
 							contactName: senderName,
 							targetEmail: message.sendUserId,
-							// 传入接收方自身昵称，供视频窗口本地占位符使用
 							currentUserName: store.getUserData("userInfo")?.nickName
 						});
 						videoChatWindow = getWindowsMap("videoChat");
-						// 阻塞等待窗口初始化完成
 						await new Promise((resolve) => {
 							setTimeout(resolve, 2000);
 						});
@@ -236,12 +231,46 @@ const createWs = (token) => {
 							sendUserNickName: senderName
 						});
 					} else {
-						// 窗口已存在，直接转发信令（携带补全后的昵称供 handleOffer 使用）
 						const senderSession = await selectUserSessionByContactId(message.sendUserId);
 						const senderName = senderSession?.contactName || message.sendUserNickName;
 						videoChatWindow.webContents.send("webrtc:signal-message", {
 							...message,
 							sendUserNickName: senderName
+						});
+					}
+					break;
+
+				case 17: // 语音通话信令（messageType=17）
+					let voiceChatWindow = getWindowsMap("voiceChat");
+
+					if (!voiceChatWindow) {
+						// 只有 offer（来电）才需要打开新窗口
+						if (message.signalType !== "offer") {
+							break;
+						}
+
+						const voiceSenderSession = await selectUserSessionByContactId(message.sendUserId);
+						const voiceSenderName = voiceSenderSession?.contactName || message.sendUserNickName;
+
+						await voiceChat(message.receiveUserId, message.sendUserId, {
+							contactName: voiceSenderName,
+							targetEmail: message.sendUserId,
+							currentUserName: store.getUserData("userInfo")?.nickName
+						});
+						voiceChatWindow = getWindowsMap("voiceChat");
+						// 等待窗口渲染完成后再转发信令
+						await new Promise((resolve) => setTimeout(resolve, 2000));
+
+						voiceChatWindow.webContents.send("voicertc:signal-message", {
+							...message,
+							sendUserNickName: voiceSenderName
+						});
+					} else {
+						const voiceSenderSession = await selectUserSessionByContactId(message.sendUserId);
+						const voiceSenderName = voiceSenderSession?.contactName || message.sendUserNickName;
+						voiceChatWindow.webContents.send("voicertc:signal-message", {
+							...message,
+							sendUserNickName: voiceSenderName
 						});
 					}
 					break;
@@ -353,7 +382,7 @@ export const sendSignalMessage = (message) => {
 };
 
 /**
- * 更新连接状态并通知渲染进程
+ * 更新连接状态并通知视频/语音通话窗口
  * @param {string} status - 连接状态
  */
 const updateConnectionStatus = (status) => {
@@ -361,6 +390,10 @@ const updateConnectionStatus = (status) => {
 	const videoChatWindow = getWindowsMap("videoChat");
 	if (videoChatWindow) {
 		videoChatWindow.webContents.send("webrtc:connection-status", status);
+	}
+	const voiceChatWindow = getWindowsMap("voiceChat");
+	if (voiceChatWindow) {
+		voiceChatWindow.webContents.send("voicertc:connection-status", status);
 	}
 };
 
@@ -370,6 +403,21 @@ const videoChat = async (useId, recipient, extraData = {}) => {
 		windowId: "videoChat",
 		title: "视频通话",
 		path: "/videoChat",
+		data: {
+			useId,
+			recipient,
+			...extraData
+		}
+	};
+	await openWindow(param);
+};
+
+// 打开语音通话窗口
+const voiceChat = async (useId, recipient, extraData = {}) => {
+	const param = {
+		windowId: "voiceChat",
+		title: "语音通话",
+		path: "/voiceChat",
 		data: {
 			useId,
 			recipient,

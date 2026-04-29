@@ -73,8 +73,14 @@ public class ServerListenerHandler extends SimpleChannelInboundHandler<TextWebSo
         try {
             // 解析消息
             PeerConnectionDataDto data = JSON.parseObject(msg, PeerConnectionDataDto.class);
-            data.setSendUserId(userId); // 设置发送者ID
-            data.setMessageType(MessageTypeEnum.VIDEO_CALL.getType()); // 设置视频通话数据类型
+            data.setSendUserId(userId); // 设置发送者ID（防止伪造）
+            // 优先使用客户端传入的 messageType（17=语音通话），未传时默认视频通话(15)
+            Integer incomingType = jsonObject.getInteger("messageType");
+            if (incomingType != null && incomingType.equals(MessageTypeEnum.VOICE_CALL.getType())) {
+                data.setMessageType(MessageTypeEnum.VOICE_CALL.getType());
+            } else {
+                data.setMessageType(MessageTypeEnum.VIDEO_CALL.getType());
+            }
 
             // 处理消息
             webSocketMessageService.handleMessage(ctx, data);

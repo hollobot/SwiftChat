@@ -152,16 +152,16 @@
 	]);
 
 	const bottomMenuList = ref([
-		{
-			path: "/main/undeveloped",
-			class: "icon-weixinxiaochengxu",
-			title: "小程序面板"
-		},
-		{
-			path: "/main/undeveloped",
-			class: "icon-shouji",
-			title: "手机"
-		},
+		// {
+		// 	path: "/main/undeveloped",
+		// 	class: "icon-weixinxiaochengxu",
+		// 	title: "小程序面板"
+		// },
+		// {
+		// 	path: "/main/undeveloped",
+		// 	class: "icon-shouji",
+		// 	title: "手机"
+		// },
 		{
 			path: "/main/setting",
 			class: "icon-shezhi",
@@ -307,6 +307,7 @@
 				display: flex;
 				flex-direction: column;
 				align-items: center;
+				justify-content: end;
 				.is-click {
 					color: #07c160 !important;
 				}
