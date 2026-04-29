@@ -22,8 +22,9 @@
 					<div v-if="data.fileType == 1">
 						<ChatMessageVideo :data="data"></ChatMessageVideo>
 					</div>
-					<div v-if="data.fileType == 2">
-						<ChatMessageFile :data="data"></ChatMessageFile>
+					<!-- fileType=2 普通文件，3 PDF，4 文本/代码，均用同一卡片组件，点击后进入预览窗口 -->
+					<div v-if="data.fileType == 2 || data.fileType == 3 || data.fileType == 4">
+						<ChatMessageFile :data="data" @download="handleFileDownload(data)"></ChatMessageFile>
 					</div>
 				</div>
 			</template>
@@ -109,8 +110,9 @@
 					<div v-if="data.fileType == 1">
 						<ChatMessageVideo :data="data"></ChatMessageVideo>
 					</div>
-					<div v-if="data.fileType == 2">
-						<ChatMessageFile :data="data"></ChatMessageFile>
+					<!-- fileType=2 普通文件，3 PDF，4 文本/代码 -->
+					<div v-if="data.fileType == 2 || data.fileType == 3 || data.fileType == 4">
+						<ChatMessageFile :data="data" @download="handleFileDownload(data)"></ChatMessageFile>
 					</div>
 				</div>
 			</template>
@@ -161,6 +163,14 @@
 			return;
 		}
 		emit("showMediaDetail", data.uuid);
+	};
+
+	// 普通文件点击"下载"按钮直接触发另存为，不打开预览窗口
+	const handleFileDownload = (data) => {
+		window.ipcRenderer.send("downloadFile", {
+			partType: "chat",
+			fileId: data.uuid
+		});
 	};
 </script>
 

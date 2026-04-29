@@ -221,7 +221,14 @@ const stopLocalServer = () => {
 	server?.close();
 };
 
-const FILE_TYPE_CONTENT_TYPE = { 0: "image/", 1: "video/", 2: "application/octet-stream" };
+// 图片/视频只存前缀（后面需要拼接文件后缀），PDF/文本/普通文件是完整 MIME
+const FILE_TYPE_CONTENT_TYPE = {
+	0: "image/",                     // 拼接：image/jpg、image/png …
+	1: "video/",                     // 拼接：video/mp4 …
+	2: "application/octet-stream",   // 二进制下载
+	3: "application/pdf",            // PDF 直接预览
+	4: "text/plain; charset=utf-8"   // 文本/代码 直接渲染
+};
 
 // 获取本地文件
 expressServer.get("/file", async (req, resp) => {
@@ -237,7 +244,9 @@ expressServer.get("/file", async (req, resp) => {
 		await downloadFile(fileId, showCover, localPath, partType);
 	}
 	const fileSuffix = localPath.substring(localPath.lastIndexOf(".") + 1);
-	const contentType = FILE_TYPE_CONTENT_TYPE[fileType] + fileSuffix;
+	// 图片(0)和视频(1)的 MIME 需要追加文件后缀，其余类型直接用完整 Content-Type
+	const baseType = FILE_TYPE_CONTENT_TYPE[fileType] ?? "application/octet-stream";
+	const contentType = (fileType == 0 || fileType == 1) ? baseType + fileSuffix : baseType;
 
 	// 设置必要的头
 	resp.setHeader("Access-Control-Allow-Origin", "*");

@@ -623,8 +623,12 @@
 
 	// 打开媒体消息预览窗口
 	const showMediaDetailHandler = (messageUUid) => {
+		// 判断点击的是图片/视频(fileType 0/1)还是文件(fileType 2/3/4)，分组翻页
+		const clicked = messageList.value.find((item) => item.uuid == messageUUid);
+		const isMedia = clicked?.fileType != null && clicked.fileType <= 1;
 		let showFileList = messageList.value.filter((item) => {
-			return item.messageType == 5;
+			if (item.messageType != 5) return false;
+			return isMedia ? item.fileType <= 1 : item.fileType >= 2;
 		});
 		// map()返回一个新的数组
 		showFileList = showFileList.map((item) => {
