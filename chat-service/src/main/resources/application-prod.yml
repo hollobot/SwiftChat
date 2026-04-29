@@ -1,5 +1,6 @@
 server:
   port: 7777
+  address: 0.0.0.0
   servlet:
     context-path: /api
 
@@ -152,3 +153,26 @@ pagehelper:
   support-methods-arguments: true # 支持接口参数
   params: count=countSql        # 统计查询配置
   page-size-zero: true          # 允许 pageSize=0 返回全部结果
+
+
+
+cors:
+  # 本地开发示例，可按需替换为前端真实域名
+  allowed-origins: []
+  allowed-methods:
+    - GET
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+    - OPTIONS
+  allowed-headers:
+    - Content-Type
+    - Authorization
+    - X-Requested-With
+    - Accept
+    - Origin
+  exposed-headers:
+    - Authorization
+  max-age: 3600
+  allow-credentials: false

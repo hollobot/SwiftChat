@@ -42,6 +42,7 @@ const removePendingRequest = (config) => {
 
 const api = axios.create({
 	baseURL: NODE_ENV === "development" ? `/api/api` : apiConst.prodDomain + "/api"
+	// baseURL: apiConst.prodDomain + "/api"
 });
 
 // 添加请求拦截器
