@@ -1,0 +1,85 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="第 1 页" id="DZxaXQxS8kZG261G0Cyn">
+    <mxGraphModel dx="1414" dy="777" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-2" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=14;fontStyle=1;" value="开始" vertex="1">
+          <mxGeometry height="44" width="120" x="290" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="搜索目标账号，查看对方信息" vertex="1">
+          <mxGeometry height="48" width="180" x="260" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="发起好友申请（可附留言）" vertex="1">
+          <mxGeometry height="48" width="180" x="260" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="对方收到申请通知，审核列表未读提示" vertex="1">
+          <mxGeometry height="48" width="200" x="250" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-6" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="审核申请？" vertex="1">
+          <mxGeometry height="80" width="160" x="270" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="同意：双方互为好友，新增会话入口" vertex="1">
+          <mxGeometry height="48" width="200" x="110" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="拒绝：申请关闭，发起方无通知" vertex="1">
+          <mxGeometry height="48" width="200" x="430" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="进入联系人管理" vertex="1">
+          <mxGeometry height="48" width="180" x="260" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-10" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="选择操作？" vertex="1">
+          <mxGeometry height="80" width="160" x="270" y="830" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="拉黑：消息不推送，保留好友关系" vertex="1">
+          <mxGeometry height="48" width="200" x="10" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="删除：解除好友关系，会话保留" vertex="1">
+          <mxGeometry height="48" width="200" x="580" y="1028" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-13" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=14;fontStyle=1;" value="结束" vertex="1">
+          <mxGeometry height="44" width="120" x="300" y="1030" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-14" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="IHMwAtUXe1hjbDXCxwIn-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-15" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="IHMwAtUXe1hjbDXCxwIn-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-16" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="IHMwAtUXe1hjbDXCxwIn-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-17" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-5" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="IHMwAtUXe1hjbDXCxwIn-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-18" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-6" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;fontSize=11;" target="IHMwAtUXe1hjbDXCxwIn-7" value="同意">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-19" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-6" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;fontSize=11;" target="IHMwAtUXe1hjbDXCxwIn-8" value="拒绝">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-20" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-7" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="IHMwAtUXe1hjbDXCxwIn-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-21" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-8" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="IHMwAtUXe1hjbDXCxwIn-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-22" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-9" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="IHMwAtUXe1hjbDXCxwIn-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-23" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-10" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;fontSize=11;" target="IHMwAtUXe1hjbDXCxwIn-11" value="拉黑">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-24" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-10" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;fontSize=11;" target="IHMwAtUXe1hjbDXCxwIn-12" value="删除">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-25" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-11" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="IHMwAtUXe1hjbDXCxwIn-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="IHMwAtUXe1hjbDXCxwIn-26" edge="1" parent="1" source="IHMwAtUXe1hjbDXCxwIn-12" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="IHMwAtUXe1hjbDXCxwIn-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

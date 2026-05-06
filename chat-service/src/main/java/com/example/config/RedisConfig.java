@@ -6,6 +6,7 @@ import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.codec.JsonJacksonCodec;
 import org.redisson.config.Config;
+import org.redisson.config.SingleServerConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.util.StringUtils;
 
 @Slf4j
 @Configuration
@@ -59,13 +61,17 @@ public class RedisConfig {
     @Bean(destroyMethod = "shutdown")
     public RedissonClient redissonClient(){
         RedissonClient redissonClient = null;
+        String redisAddress = "redis://" + redisHost + ":" + redisPort;
         try{
             Config config = new Config();
             config.setCodec(new JsonJacksonCodec()); // 使用JSON序列化与接受的数据对象需要序列化相同，否则监听不到
-            config.useSingleServer().setAddress("redis://"+redisHost+":"+redisPort).setPassword(redisPassword);
+            SingleServerConfig singleServerConfig = config.useSingleServer().setAddress(redisAddress);
+            if (StringUtils.hasText(redisPassword)) {
+                singleServerConfig.setPassword(redisPassword);
+            }
             redissonClient = Redisson.create(config);
         }catch (Exception e){
-            log.error("redisson连接失败，请检查redisson初始化配置bean\n{}",e);
+            log.error("redisson连接失败，请检查配置，address={}", redisAddress, e);
             throw new CustomException(ExceptionCodeEnum.CODE_500);
         }
         return redissonClient;

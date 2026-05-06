@@ -34,7 +34,9 @@ import {
 	onGetAppVersion,
 	onOpenUpdateUrl,
 	setupIpcHandlers,
-	changeSessionContentName
+	changeSessionContentName,
+	bindWindowMaxStateChange,
+	onGetWindowMaxState
 } from "./ipc";
 import { setWindowsMap } from "./windowProxy";
 
@@ -80,6 +82,7 @@ function createWindow() {
 
 	// 将主窗口添加到map里
 	setWindowsMap("main", mainWindow);
+	bindWindowMaxStateChange(mainWindow);
 
 	const createTray = (win, type = "login", isAdmin = false) => {
 		// 创建托盘图标，使用 resources 文件夹中的图标
@@ -236,6 +239,7 @@ function createWindow() {
 	onGetEmailHistory();
 	onGetAppVersion();
 	onOpenUpdateUrl();
+	onGetWindowMaxState();
 	setupIpcHandlers();
 	changeSessionContentName();
 	// HMR for renderer base on electron-vite cli.

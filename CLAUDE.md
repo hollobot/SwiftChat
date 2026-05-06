@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 默认沟通与项目工作流
+
+- 除非用户明确要求使用其他语言，否则对话使用中文。
+- 进行开发项目时，除非用户明确要求，或当前说明明确要求，否则不要执行测试、构建或编译命令。
+- 只格式化自己改动过的部分。除非用户明确要求，否则不要对未触碰的文件或整个项目运行大范围格式化工具。
+
+
 ## 项目概览
 
 SwiftChat 是一个分布式桌面即时通讯应用，由两个独立模块组成：

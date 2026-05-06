@@ -127,6 +127,7 @@
 		codeKey: ""
 	});
 	const checkCodeBase64 = ref();
+	const CHECK_CODE_ERROR_MESSAGE = "验证码错误";
 
 	const rules = ref({
 		email: [{ validator: customCheck(ruleInfo.email), trigger: "blur" }],
@@ -168,6 +169,18 @@
 		sessionStorage.setItem("codeKey", codeKey);
 		checkCodeBase64.value = codeBase64;
 	}
+
+	const handleLoginError = async (data) => {
+		if (data?.message !== CHECK_CODE_ERROR_MESSAGE) {
+			return;
+		}
+
+		// 验证码输错后旧图不再适合继续使用，清空输入并切换到新的 codeKey。
+		userInfoForm.value.checkCode = "";
+		isClick.value.checkCode = false;
+		formRef.value?.clearValidate("checkCode");
+		await refreshCheckCode();
+	};
 
 	/**
 	 * 跳转注册
@@ -242,6 +255,7 @@
 
 		//1、判断状态码
 		if (data.code !== 200) {
+			await handleLoginError(data);
 			return;
 		}
 

@@ -134,7 +134,11 @@
 			</template>
 		</template>
 	</layout>
-	<ChatGroupDetail ref="chatGropDetailRef" @del-session="delGroupSession"></ChatGroupDetail>
+	<ChatGroupDetail
+		ref="chatGropDetailRef"
+		@del-session="delGroupSession"
+		@change-group-info="changeGroupInfo"
+	></ChatGroupDetail>
 </template>
 
 <script setup>
@@ -736,6 +740,18 @@
 	// 群聊退出删除群聊会话
 	const delGroupSession = (contactId) => {
 		delSession(contactId);
+	};
+
+	// 群主在聊天详情里修改群信息后，同步当前会话标题和左侧会话列表。
+	const changeGroupInfo = (groupInfo) => {
+		chatSessionList.value.forEach((session) => {
+			if (session.contactId == groupInfo.groupId) {
+				session.contactName = groupInfo.groupName;
+			}
+		});
+		if (currentChatSession.value?.contactId == groupInfo.groupId) {
+			currentChatSession.value.contactName = groupInfo.groupName;
+		}
 	};
 
 	// 定位到发送消息界面

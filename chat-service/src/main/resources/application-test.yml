@@ -1,6 +1,5 @@
 server:
   port: 7777
-  address: 0.0.0.0
   servlet:
     context-path: /api
 
@@ -24,7 +23,7 @@ spring:
     type: com.alibaba.druid.pool.DruidDataSource # 使用 Druid 连接池
     username: root
     password: 1+1=2yes
-    url: jdbc:mysql://127.0.0.1:3306/chat
+    url: jdbc:mysql://8.136.30.123:3306/chat
     driver-class-name: com.mysql.cj.jdbc.Driver
     ########## 连接池 配置 ##########
     druid:
@@ -94,7 +93,7 @@ spring:
         deny:                                        # 拒绝访问的地址，deny优先于allow，如果在deny列表中，就算在allow列表中，也会被拒绝
 
   redis:
-    host: 127.0.0.1
+    host: 8.136.30.123
     port: 6379
     password: 123456
 
@@ -106,11 +105,11 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     # MyBatis 配置
     map-underscore-to-camel-case: true
-  global-config: # 这里的缩进层级错误
-      # 全局配置
-      db-config:
-        # 数据库配置 使用数据库自增 ID 作为主键。
-        id-type: auto
+  global-config:  # 这里的缩进层级错误
+    # 全局配置
+    db-config:
+      # 数据库配置 使用数据库自增 ID 作为主键。
+      id-type: auto
 
 #logging:
 #  level:
@@ -125,11 +124,13 @@ springfox:
 #    static-locations: classpath:/swagger/   # 配置静态资源路径
 
 #自定义数据
+
 admin:
   email: 2380983020@qq.com
 
 project:
-  folder: /root/temp/chat/
+  folder: D:\6_temp\chat\
+
 
 # netty 配置
 netty:
@@ -156,9 +157,20 @@ pagehelper:
 
 
 
+logging:
+  level:
+    com.example.websocket: DEBUG  # 你的包名
+    # 或者设置根日志级别
+#    root: DEBUG
+
+
 cors:
   # 本地开发示例，可按需替换为前端真实域名
-  allowed-origins: []
+  allowed-origins:
+    - http://localhost:5173
+    - http://localhost:5174
+    - http://127.0.0.1:5173
+    - http://127.0.0.1:5174
   allowed-methods:
     - GET
     - POST

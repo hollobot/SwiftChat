@@ -18,6 +18,7 @@ import {
 import { join } from "path";
 const NODE_ENV = process.env.NODE_ENV;
 import { saveTempFile } from "./file";
+let isWindowMaxStateHandlerRegistered = false;
 
 import {
 	selectMessagePageList,
@@ -62,6 +63,33 @@ export const winToMain = (callback) => {
 export const winControl = (callback) => {
 	ipcMain.on("sendWinControl", (e, config) => {
 		callback(e, config);
+	});
+};
+
+const sendWindowMaxState = (win) => {
+	if (!win || win.isDestroyed()) {
+		return;
+	}
+	win.webContents.send("winMaxStateChange", { isMax: win.isMaximized() });
+};
+
+/**
+ * 同步窗口真实最大化状态，覆盖系统拖拽还原等非按钮触发的场景。
+ * @param {BrowserWindow} win
+ */
+export const bindWindowMaxStateChange = (win) => {
+	win.on("maximize", () => sendWindowMaxState(win));
+	win.on("unmaximize", () => sendWindowMaxState(win));
+};
+
+export const onGetWindowMaxState = () => {
+	if (isWindowMaxStateHandlerRegistered) {
+		return;
+	}
+	isWindowMaxStateHandlerRegistered = true;
+	ipcMain.handle("getWindowMaxState", (e) => {
+		const win = BrowserWindow.fromWebContents(e.sender);
+		return win?.isMaximized() ?? false;
 	});
 };
 
@@ -184,6 +212,7 @@ export const openWindow = async ({
 			}
 		});
 		setWindowsMap(windowId, newWindow);
+		bindWindowMaxStateChange(newWindow);
 		newWindow.setMinimumSize(600, 484);
 		// 使用 Vite 开发服务器提供的 URL
 		// 例如: http://localhost:5173/index.html#/admin

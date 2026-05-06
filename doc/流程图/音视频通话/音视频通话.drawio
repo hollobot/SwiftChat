@@ -1,0 +1,113 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="音视频通话" id="Fv_Pclzsd2LXlouqDTnP">
+    <mxGraphModel dx="2020" dy="1110" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-1" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=14;fontStyle=1;" value="开始" vertex="1">
+          <mxGeometry height="44" width="120" x="334" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="发起通话（语音/视频）" vertex="1">
+          <mxGeometry height="48" width="180" x="304" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-3" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="对方在线？" vertex="1">
+          <mxGeometry height="80" width="160" x="314" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="超时→主叫方收「无人接听」提示" vertex="1">
+          <mxGeometry height="48" width="200" x="10" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="对方弹出来电界面（显示主叫信息）" vertex="1">
+          <mxGeometry height="48" width="200" x="590" y="356" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-6" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="接听/拒绝？" vertex="1">
+          <mxGeometry height="80" width="160" x="610" y="564" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="主叫方收「对方已拒绝」提示" vertex="1">
+          <mxGeometry height="48" width="200" x="900" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="建立连接：语音/视频实时传输" vertex="1">
+          <mxGeometry height="48" width="200" x="590" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-9" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="通话异常？" vertex="1">
+          <mxGeometry height="80" width="160" x="504" y="880" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="网络中断→双方收「通话异常」提示" vertex="1">
+          <mxGeometry height="48" width="200" x="190" y="896" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=13;" value="任意一方挂断→通话结束提示" vertex="1">
+          <mxGeometry height="48" width="200" x="760" y="1098" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-12" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontColor=#000000;fontSize=14;fontStyle=1;" value="结束" vertex="1">
+          <mxGeometry height="44" width="120" x="50" y="1100" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-13" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="sXiqjCvb52A_PSWkXlXL-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-14" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="sXiqjCvb52A_PSWkXlXL-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-16" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;fontSize=11;" target="sXiqjCvb52A_PSWkXlXL-5" value="是">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-17" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-5" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="sXiqjCvb52A_PSWkXlXL-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-18" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-6" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;fontSize=11;" target="sXiqjCvb52A_PSWkXlXL-7" value="拒绝">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-19" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-6" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;fontSize=11;" target="sXiqjCvb52A_PSWkXlXL-8" value="接听">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-20" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-8" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="sXiqjCvb52A_PSWkXlXL-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-21" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-9" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;fontSize=11;" target="sXiqjCvb52A_PSWkXlXL-10" value="是（网络中断）">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-22" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-9" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;fontSize=11;" target="sXiqjCvb52A_PSWkXlXL-11" value="否（挂断）">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-23" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="sXiqjCvb52A_PSWkXlXL-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-26" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-11" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#000000;" target="sXiqjCvb52A_PSWkXlXL-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-28" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-3" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="sXiqjCvb52A_PSWkXlXL-4" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="110" y="380" />
+            </Array>
+            <mxPoint x="140" y="520" as="sourcePoint" />
+            <mxPoint x="190" y="470" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-29" connectable="0" parent="sXiqjCvb52A_PSWkXlXL-28" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="否" vertex="1">
+          <mxGeometry relative="1" x="-0.4575" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-31" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-10" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="sXiqjCvb52A_PSWkXlXL-12" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="110" y="920" />
+            </Array>
+            <mxPoint x="260" y="1030" as="sourcePoint" />
+            <mxPoint x="282" y="1120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sXiqjCvb52A_PSWkXlXL-32" edge="1" parent="1" source="sXiqjCvb52A_PSWkXlXL-7" style="endArrow=classic;html=1;rounded=0;exitX=0.657;exitY=0.982;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitPerimeter=0;" target="sXiqjCvb52A_PSWkXlXL-12" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <Array as="points">
+              <mxPoint x="1030" y="824" />
+              <mxPoint x="1030" y="1240" />
+              <mxPoint x="110" y="1240" />
+            </Array>
+            <mxPoint x="960" y="840" as="sourcePoint" />
+            <mxPoint x="1010" y="790" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

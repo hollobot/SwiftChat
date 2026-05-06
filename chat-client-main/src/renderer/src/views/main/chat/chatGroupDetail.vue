@@ -63,6 +63,9 @@
 				<div v-if="!isOwner && isInMemberList" class="handler" @click="breakGroup">
 					退出群聊
 				</div>
+				<div v-if="isOwner && isInMemberList" class="handler edit-handler" @click="showGroupUpdate">
+					修改群聊
+				</div>
 				<div v-if="isOwner && isInMemberList" class="handler" @click="disbandGroup">
 					解散群聊
 				</div>
@@ -70,6 +73,10 @@
 		</el-drawer>
 	</div>
 	<SelectUser :data="groupInfo" ref="selectUserRef"></SelectUser>
+	<ContactGroupDetail
+		ref="contactGroupDetailRef"
+		@change-group-list="changeGroupInfo"
+	></ContactGroupDetail>
 </template>
 <script setup>
 	import { ref, computed } from "vue";
@@ -81,6 +88,7 @@
 	const { userInfo } = storeToRefs(userInfoStore);
 	import ShowLocalImage from "@/components/showLocalImage.vue";
 	import SelectUser from "./selectUser.vue";
+	import ContactGroupDetail from "../contact/contactGroupDetail.vue";
 	import { batchAddGroupContact } from "@/api/groupContactApi";
 	import { ElMessageBox } from "element-plus";
 	import { disband } from "@/api/groupApi";
@@ -95,7 +103,7 @@
 	const memberList = ref([]);
 	const groupInfo = ref({});
 
-	const emit = defineEmits(["delSession"]);
+	const emit = defineEmits(["delSession", "changeGroupInfo"]);
 
 	const isOwner = computed(() => {
 		return groupInfo.value.ownerId == userInfo.value.userId;
@@ -163,6 +171,18 @@
 			groupSessionId
 		});
 		showDrawer.value = false;
+	};
+
+	const contactGroupDetailRef = ref();
+	const showGroupUpdate = () => {
+		contactGroupDetailRef.value.show({ id: groupInfo.value.groupId });
+	};
+
+	const changeGroupInfo = (newGroupInfo) => {
+		// 群编辑组件保存成功后，同步当前详情抽屉和外层会话标题。
+		groupInfo.value = { ...groupInfo.value, ...newGroupInfo };
+		emit("changeGroupInfo", newGroupInfo);
+		contactStore.selectGroupList(userInfo.value.userId);
 	};
 
 	// 退出群聊
@@ -302,6 +322,10 @@
 			opacity: 0.6;
 			&:hover {
 				opacity: 1;
+			}
+
+			&.edit-handler {
+				color: #409eff;
 			}
 		}
 	}

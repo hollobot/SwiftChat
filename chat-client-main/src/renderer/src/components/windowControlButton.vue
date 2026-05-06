@@ -24,7 +24,7 @@
 </template>
 
 <script setup>
-	import { ref, onMounted } from "vue";
+	import { ref, onMounted, onUnmounted } from "vue";
 	import { isEmpty } from "@/utils/stringUtils";
 
 	const isMax = ref(false);
@@ -82,12 +82,32 @@
 	};
 
 	const maxWindow = () => {
-		isMax.value = !isMax.value;
-		controlClick("max", isMax.value);
+		const nextMaxState = !isMax.value;
+		isMax.value = nextMaxState;
+		controlClick("max", nextMaxState);
+	};
+
+	const syncMaxState = (data) => {
+		isMax.value = data?.isMax ?? false;
+	};
+
+	const initMaxState = async () => {
+		isMax.value = await window.ipcRenderer.invoke("getWindowMaxState");
+	};
+
+	const onWindowMaxStateChange = (_e, data) => {
+		syncMaxState(data);
 	};
 
 	onMounted(() => {
 		initPin();
+		initMaxState();
+		// 监听主进程的真实窗口状态，避免系统拖拽还原后按钮图标不同步。
+		window.ipcRenderer.on("winMaxStateChange", onWindowMaxStateChange);
+	});
+
+	onUnmounted(() => {
+		window.ipcRenderer.removeListener("winMaxStateChange", onWindowMaxStateChange);
 	});
 </script>
 
