@@ -77,6 +77,11 @@
 	import avatar from "@/assets/image/avatar/avatar.jpg";
 	import { useUserInfoStore } from "@/stores/userInfoStore";
 	import { storeToRefs } from "pinia";
+	import {
+		formatCallDuration,
+		getCallEventText,
+		sendCallEventMessage
+	} from "@/utils/callMessage";
 
 	const userInfoStore = useUserInfoStore();
 	const { userInfo } = storeToRefs(userInfoStore);
@@ -90,6 +95,7 @@
 	const incomingCallVisible = ref(false);
 	const pendingOffer = ref(null);
 	const audioEnabled = ref(true);
+	const isCaller = ref(false);
 
 	const windowControl = {
 		isShowPin: true,
@@ -132,6 +138,9 @@
 	let localStream = null;
 	let peer = null;
 	let isProcessingAnswer = false;
+	let callStartedAt = null;
+	let hasSentFinalMessage = false;
+	let isClosing = false;
 	// 远端描述就绪前缓存的 ICE 候选
 	let pendingIceCandidates = [];
 
@@ -196,10 +205,12 @@
 			if (peer.connectionState === "connected") {
 				isConnected.value = true;  // P2P 通路建立，切换提示为"已连线"
 				answerReceived.value = false; // 清除中间态
+				if (!callStartedAt) callStartedAt = Date.now();
 			} else if (peer.connectionState === "failed") {
 				isConnected.value = false;
 			} else if (peer.connectionState === "disconnected") {
 				isConnected.value = false;
+				if (isCaller.value) sendVoiceCallMessage("end");
 				endCall(false);
 			}
 		};
@@ -229,7 +240,10 @@
 		const hasLiveAudio = localStream && localStream.getAudioTracks().some((t) => t.readyState === "live");
 		if (!hasLiveAudio) {
 			const ok = await getLocalMedia();
-			if (!ok) return;
+			if (!ok) {
+				await sendVoiceCallMessage("cancel");
+				return;
+			}
 		}
 
 		await createPeerConnection();
@@ -276,6 +290,7 @@
 		if (signalType === "notOnline" && flog) {
 			flog = false;
 			ElMessage({ message: "对方可能不在线" });
+			await sendVoiceCallMessage("cancel");
 			setTimeout(() => {
 				isInCall.value = false;
 				if (!flog) flog = true;
@@ -343,11 +358,13 @@
 	}
 
 	// 拒绝来电
-	function rejectIncomingCall() {
+	async function rejectIncomingCall() {
+		if (isClosing) return;
+		isClosing = true;
 		incomingCallVisible.value = false;
 		pendingOffer.value = null;
 		sendSignalMessage("reject_call", {});
-		window.ipcRenderer.send("sendWinControl", { action: "close", type: 0 });
+		closeCurrentWindow();
 	}
 
 	// 处理对方的 answer
@@ -394,16 +411,24 @@
 
 	async function handleRejectCall() {
 		ElMessage({ message: "对方已拒绝通话", type: "warning", duration: 2000 });
+		await sendVoiceCallMessage("reject");
 		await endCall(false, 2000);
 	}
 
 	async function handleEndCall() {
+		await sendVoiceCallMessage(callStartedAt ? "end" : "cancel");
 		await endCall(false);
 	}
 
 	// 结束通话并关闭窗口
 	async function endCall(sendSignal = true, closeDelay = 0) {
+		if (isClosing) return;
+		isClosing = true;
+		const shouldRecord = isCaller.value && sendSignal && isInCall.value;
 		if (sendSignal && isInCall.value) sendSignalMessage("end_call", {});
+		if (shouldRecord) {
+			await sendVoiceCallMessage(callStartedAt ? "end" : "cancel");
+		}
 
 		isInCall.value = false;
 		answerReceived.value = false;
@@ -417,7 +442,38 @@
 		}
 
 		if (closeDelay > 0) await new Promise((r) => setTimeout(r, closeDelay));
-		window.ipcRenderer.send("sendWinControl", { action: "close", type: 0 });
+		closeCurrentWindow();
+	}
+
+	function closeCurrentWindow() {
+		window.ipcRenderer.send("sendWinControl", { action: "close", type: 0, force: true });
+	}
+
+	async function handleWindowBeforeClose() {
+		if (incomingCallVisible.value && pendingOffer.value) {
+			await rejectIncomingCall();
+			return;
+		}
+		await endCall(true);
+	}
+
+	async function sendVoiceCallMessage(event) {
+		if (!isCaller.value || hasSentFinalMessage || !targetUserId.value) return;
+		hasSentFinalMessage = true;
+		await sendCallEventMessage({
+			contactId: targetUserId.value,
+			sessionId: initData.value?.sessionId,
+			recipientType: 0,
+			userInfo: {
+				userId: currentUserId.value,
+				nickName: initData.value?.currentUserName || userInfo.value?.nickName
+			},
+			messageContent: getCallEventText({
+				mediaType: "audio",
+				event,
+				durationText: formatCallDuration(callStartedAt)
+			})
+		});
 	}
 
 	function toggleAudio() {
@@ -443,6 +499,10 @@
 			initData.value = data;
 			targetUserId.value = data.recipient;
 			currentUserId.value = data.useId;
+			isCaller.value = data.isCaller === true;
+			callStartedAt = null;
+			hasSentFinalMessage = false;
+			isClosing = false;
 			await syncRemoteProfile(data);
 
 			// 主动发起时自动开始呼叫
@@ -451,11 +511,13 @@
 
 		await getLocalMedia();
 		setupIpcListeners();
+		window.ipcRenderer.on("call-window:before-close", handleWindowBeforeClose);
 	});
 
 	onUnmounted(() => {
 		if (localStream) localStream.getTracks().forEach((t) => t.stop());
 		if (peer) peer.close();
+		window.ipcRenderer.removeListener("call-window:before-close", handleWindowBeforeClose);
 		remover();
 	});
 </script>

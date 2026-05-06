@@ -33,6 +33,12 @@ let heartbeatInterval = null; // 用来保存发送心跳定时器ID
 // 连接状态 默认未连接（必须用 let，updateConnectionStatus 内会重新赋值）
 let connectionStatus = "disconnected";
 
+export const sendToRenderer = (channel, data) => {
+	if (sender && !sender.isDestroyed()) {
+		sender.send(channel, data);
+	}
+};
+
 export const initWs = (userInfo, _sender) => {
 	wsUrl =
 		NODE_ENV === "development" ? store.getData("devWsDomain") : store.getData("prodWsDomain");
@@ -126,12 +132,13 @@ const createWs = (token) => {
 				case 11: // 退出了群聊
 				case 12: // 被管理员移出了群聊
 				case 13: // 添加好友成功消息
+				case 18: // 群通话系统消息
 					message.userId = store.getUserId();
 					//群聊接收消息处理，如果是自己发送的不处理
 					if (
 						message.sendUserId == store.getUserId() &&
 						message.recipientType == 1 &&
-						(message.messageType == 2 || message.messageType == 5)
+						(message.messageType == 2 || message.messageType == 5 || message.messageType == 18)
 					) {
 						break;
 					}
@@ -219,6 +226,7 @@ const createWs = (token) => {
 						await videoChat(message.receiveUserId, message.sendUserId, {
 							contactName: senderName,
 							targetEmail: message.sendUserId,
+							sessionId: senderSession?.sessionId,
 							currentUserName: store.getUserData("userInfo")?.nickName
 						});
 						videoChatWindow = getWindowsMap("videoChat");
@@ -241,6 +249,11 @@ const createWs = (token) => {
 					break;
 
 				case 17: // 语音通话信令（messageType=17）
+					if (message.callMode === "group" || message.groupId) {
+						await handleGroupVoiceSignal(message);
+						break;
+					}
+
 					let voiceChatWindow = getWindowsMap("voiceChat");
 
 					if (!voiceChatWindow) {
@@ -255,6 +268,7 @@ const createWs = (token) => {
 						await voiceChat(message.receiveUserId, message.sendUserId, {
 							contactName: voiceSenderName,
 							targetEmail: message.sendUserId,
+							sessionId: voiceSenderSession?.sessionId,
 							currentUserName: store.getUserData("userInfo")?.nickName
 						});
 						voiceChatWindow = getWindowsMap("voiceChat");
@@ -364,7 +378,9 @@ export const closeWs = () => {
 export const sendSignalMessage = (message) => {
 	if (!ws || ws.readyState !== WebSocket.OPEN) {
 		console.error("发送信令失败，WebSocket 未连接:", message.signalType, message);
-		sender.send("webrtc:connection-error", "WebSocket not connected");
+		const errorChannel =
+			message.callMode === "group" ? "groupvoicertc:connection-error" : "webrtc:connection-error";
+		sender.send(errorChannel, "WebSocket not connected");
 		return false;
 	}
 
@@ -376,7 +392,9 @@ export const sendSignalMessage = (message) => {
 		return true;
 	} catch (error) {
 		console.error("发送信令异常:", message.signalType, error);
-		sender.send("webrtc:connection-error", "Failed to send signal message");
+		const errorChannel =
+			message.callMode === "group" ? "groupvoicertc:connection-error" : "webrtc:connection-error";
+		sender.send(errorChannel, "Failed to send signal message");
 		return false;
 	}
 };
@@ -395,6 +413,49 @@ const updateConnectionStatus = (status) => {
 	if (voiceChatWindow) {
 		voiceChatWindow.webContents.send("voicertc:connection-status", status);
 	}
+	const groupVoiceChatWindow = getWindowsMap("groupVoiceChat");
+	if (groupVoiceChatWindow) {
+		groupVoiceChatWindow.webContents.send("groupvoicertc:connection-status", status);
+	}
+};
+
+const parseSignalData = (message) => {
+	try {
+		return JSON.parse(message.signalData || "{}");
+	} catch (error) {
+		console.error("解析通话信令扩展数据失败:", error);
+		return {};
+	}
+};
+
+const handleGroupVoiceSignal = async (message) => {
+	let groupVoiceChatWindow = getWindowsMap("groupVoiceChat");
+
+	if (!groupVoiceChatWindow) {
+		// 只有群通话邀请需要自动打开窗口，其余群内点对点信令没有窗口时直接忽略。
+		if (message.signalType !== "group_invite") {
+			return;
+		}
+
+		const signalData = parseSignalData(message);
+		const groupSession = await selectUserSessionByContactId(message.groupId);
+		await groupVoiceChat(message.receiveUserId, message.sendUserId, {
+			...signalData,
+			callId: message.callId,
+			groupId: message.groupId,
+			groupName: message.groupName || groupSession?.contactName || "群语音通话",
+			inviterId: message.sendUserId,
+			inviterName: signalData.inviterName || message.sendUserNickName,
+			currentUserName: store.getUserData("userInfo")?.nickName,
+			isCaller: false,
+			autoStart: false,
+			incoming: true
+		});
+		groupVoiceChatWindow = getWindowsMap("groupVoiceChat");
+		await new Promise((resolve) => setTimeout(resolve, 2000));
+	}
+
+	groupVoiceChatWindow.webContents.send("groupvoicertc:signal-message", message);
 };
 
 // 打开视频聊天窗口
@@ -418,6 +479,23 @@ const voiceChat = async (useId, recipient, extraData = {}) => {
 		windowId: "voiceChat",
 		title: "语音通话",
 		path: "/voiceChat",
+		data: {
+			useId,
+			recipient,
+			...extraData
+		}
+	};
+	await openWindow(param);
+};
+
+// 打开群语音通话窗口
+const groupVoiceChat = async (useId, recipient, extraData = {}) => {
+	const param = {
+		windowId: "groupVoiceChat",
+		title: "群语音通话",
+		path: "/groupVoiceChat",
+		width: 680,
+		height: 620,
 		data: {
 			useId,
 			recipient,

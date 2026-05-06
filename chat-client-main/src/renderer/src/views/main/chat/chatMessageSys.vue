@@ -17,6 +17,8 @@
 		const data = { ...props.data };
 		if (data.messageType == 1) {
 			data.messageContent = "添加好友成功，可以聊天了";
+		} else if (typeof data.messageContent === "string") {
+			data.messageContent = data.messageContent.replace(/&nbsp;/g, " ");
 		}
 		return data;
 	});

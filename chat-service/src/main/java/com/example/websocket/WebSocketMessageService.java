@@ -71,6 +71,17 @@ public class WebSocketMessageService {
                     handleRejectCallMessage(ctx, data);
                     break;
 
+                case "group_invite":
+                case "join_call":
+                    // 群通话邀请/加入通知仍按目标成员逐个点对点透传。
+                    handleGroupCallMessage(ctx, data);
+                    break;
+
+                case "leave_call":
+                    // 群通话中单个成员离开，仍按点对点信令透传给其他成员。
+                    handleLeaveCallMessage(ctx, data);
+                    break;
+
                 case "camera_toggle":
                     // 摄像头开关通知，直接透传给对方，让对方更新占位符显示状态
                     handleCameraToggle(ctx, data);
@@ -176,6 +187,22 @@ public class WebSocketMessageService {
     }
 
     /**
+     * 处理群通话邀请/加入通知
+     */
+    private void handleGroupCallMessage(ChannelHandlerContext ctx, PeerConnectionDataDto data) {
+        log.info("处理群通话信令: {}, {} -> {}", data.getSignalType(), data.getSendUserId(), data.getReceiveUserId());
+        forwardMessageToUser(data);
+    }
+
+    /**
+     * 处理群通话成员离开消息
+     */
+    private void handleLeaveCallMessage(ChannelHandlerContext ctx, PeerConnectionDataDto data) {
+        log.info("处理LeaveCall消息: {} -> {}", data.getSendUserId(), data.getReceiveUserId());
+        forwardMessageToUser(data);
+    }
+
+    /**
      * 处理心跳消息
      */
     private void handleHeartbeatMessage(ChannelHandlerContext ctx, PeerConnectionDataDto data) {
@@ -251,11 +278,13 @@ public class WebSocketMessageService {
                 log.debug("消息转发成功: {} -> {}", data.getSendUserId(), receiveUserId);
             } else {
                 log.warn("消息转发失败，目标用户可能不在线: {} -> {}", data.getSendUserId(), receiveUserId);
-                // 把不在线消息发给自己
-                data.setSignalType("notOnline");
-                data.setReceiveUserId(data.getSendUserId());
-                message = JSON.toJSONString(data);
-                channelContextUtils.sendMessageToUser(data.getReceiveUserId(), message);
+                if (shouldNotifyOffline(data)) {
+                    // 只有呼叫发起阶段需要回传离线提示；挂断和群通话信令失败不打扰当前通话窗口。
+                    data.setSignalType("notOnline");
+                    data.setReceiveUserId(data.getSendUserId());
+                    message = JSON.toJSONString(data);
+                    channelContextUtils.sendMessageToUser(data.getReceiveUserId(), message);
+                }
             }
 
             return sent;
@@ -264,6 +293,17 @@ public class WebSocketMessageService {
             log.error("转发消息时发生异常", e);
             return false;
         }
+    }
+
+    /**
+     * 判断转发失败时是否需要通知发送方目标不在线。
+     */
+    private boolean shouldNotifyOffline(PeerConnectionDataDto data) {
+        String signalType = data.getSignalType() == null ? "" : data.getSignalType().toLowerCase();
+        if ("group".equals(data.getCallMode()) || data.getGroupId() != null) {
+            return false;
+        }
+        return !"end_call".equals(signalType);
     }
 
     /**

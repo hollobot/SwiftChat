@@ -105,13 +105,14 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             }
         }
 
-        /*2、判断发送文件类型，只处理普通文件消息，和媒体文件消息*/
+        /*2、只允许客户端主动发送普通消息、媒体消息和通话系统消息。*/
         if (!integerArrayUtils.contains(
-            new Integer[] {MessageTypeEnum.CHAT.getType(), MessageTypeEnum.MEDIA_CHAT.getType()},
+            new Integer[] {MessageTypeEnum.CHAT.getType(), MessageTypeEnum.MEDIA_CHAT.getType(),
+                MessageTypeEnum.CALL_SYSTEM.getType()},
             chatMessage.getMessageType())) {
             throw new CustomException(ExceptionCodeEnum.CODE_400);
         }
-        Integer status = chatMessage.getMessageType() == MessageTypeEnum.CHAT.getType() ? 1 : 0;
+        Integer status = chatMessage.getMessageType() == MessageTypeEnum.MEDIA_CHAT.getType() ? 0 : 1;
         chatMessage.setStatus(status);
 
         // 处理换行
@@ -121,7 +122,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         chatSession.setSessionId(chatMessage.getSessionId());
         chatSession.setLastReceiveTime(chatMessage.getSendTime());
         chatSession.setLastMessage(chatMessage.getMessageContent());
-        if (chatMessage.getRecipientType() == UserContactTypeEnum.GROUP.getType()) {
+        if (chatMessage.getRecipientType() == UserContactTypeEnum.GROUP.getType()
+            && chatMessage.getMessageType() != MessageTypeEnum.CALL_SYSTEM.getType()) {
             chatSession.setLastMessage(chatMessage.getSendUserNickName() + ":" + chatMessage.getMessageContent());
         }
         chatSessionMapper.update(chatSession);

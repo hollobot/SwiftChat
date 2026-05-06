@@ -19,7 +19,8 @@ public enum MessageTypeEnum {
     CONTACT_GROUP_APPLY(14, "", "群聊申请"),
     VIDEO_CALL(15, "", "视频通话"),
     USER_INFO_UPDATE(16, "", "用户信息更新"),
-    VOICE_CALL(17, "", "语音通话");
+    VOICE_CALL(17, "", "语音通话"),
+    CALL_SYSTEM(18, "", "通话系统消息");
 
 
     private Integer type;

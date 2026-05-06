@@ -250,6 +250,7 @@
 				recipient: userContactInfo.value.userId,
 				contactName: userContactInfo.value.nickName,
 				targetEmail: userContactInfo.value.userId,
+				isCaller: true,
 				autoStart: true
 			}
 		});
@@ -269,6 +270,7 @@
 				recipient: userContactInfo.value.userId,
 				contactName: userContactInfo.value.nickName,
 				targetEmail: userContactInfo.value.userId,
+				isCaller: true,
 				autoStart: true
 			}
 		});

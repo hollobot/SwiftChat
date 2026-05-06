@@ -47,14 +47,18 @@
 					<div class="iconfont icon-wenjianjia"></div>
 				</el-upload>
 			</div>
-			<!-- 单聊时右侧展示语音和视频通话入口 -->
-			<div v-if="currentChatSession.contactType == 0" class="call-actions">
+			<!-- 单聊展示语音/视频，群聊当前只开放语音，视频类型留给后续扩展。 -->
+			<div
+				v-if="currentChatSession.contactType == 0 || currentChatSession.contactType == 1"
+				class="call-actions"
+			>
 				<div
 					class="video-call-entry iconfont icon-dianhua3"
 					title="语音通话"
 					@click="startVoiceCall"
 				></div>
 				<div
+					v-if="currentChatSession.contactType == 0"
 					class="video-call-entry iconfont icon-video"
 					title="视频通话"
 					@click="startVideoCall"

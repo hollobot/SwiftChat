@@ -4,7 +4,7 @@ const pkg = require("../../package.json");
 import { is } from "@electron-toolkit/utils";
 import icon from "../../resources/icon.png?asset";
 import store from "./store";
-import { initWs, sendSignalMessage, startSignalServer } from "./wsClient";
+import { initWs, sendSignalMessage, sendToRenderer } from "./wsClient";
 const path = require("path");
 import {
 	addUserSetting,
@@ -38,6 +38,8 @@ import {
 } from "./database/service/chatUserSessionService";
 import { saveFile, saveFileToLocal, stopLocalServer } from "./file";
 import { delWindowsMap, getWindowsMap, setWindowsMap, windowsMap } from "./windowProxy";
+
+const CALL_WINDOW_IDS = ["videoChat", "voiceChat", "groupVoiceChat"];
 
 /**
  * 登录成功进入main页面
@@ -167,7 +169,14 @@ export const onAddLocalMessage = () => {
 		// 2、跟新会话
 		messageDto.lastReceiveTime = messageDto.sendTime;
 		messageDto.contactId = messageDto.recipientId;
-		await updateUserSessionInfo(store.getUserData("currentChatSessionId"), messageDto);
+		const currentSessionId = messageDto.skipNoRead
+			? messageDto.sessionId
+			: store.getUserData("currentChatSessionId");
+		await updateUserSessionInfo(currentSessionId, messageDto);
+		if (messageDto.fromCallWindow) {
+			const session = await selectUserSession(messageDto.recipientId);
+			sendToRenderer("localCallMessage", { ...messageDto, extendData: session });
+		}
 		// 3、发送给渲染进程跟新消息列表
 		e.sender.send("addLocalMessageCallback", { status: 1, uuid: messageDto.uuid });
 	});
@@ -243,6 +252,14 @@ export const openWindow = async ({
 			}, 500);
 		});
 		// 监听窗口关闭
+		newWindow.on("close", (event) => {
+			if (!CALL_WINDOW_IDS.includes(windowId) || newWindow.__allowClose) {
+				return;
+			}
+			// 通话窗口需要先让渲染进程发送拒绝/离开信令，再由渲染进程二次确认关闭。
+			event.preventDefault();
+			newWindow.webContents.send("call-window:before-close");
+		});
 		newWindow.on("closed", () => {
 			delWindowsMap(windowId);
 		});
@@ -274,6 +291,14 @@ export const openWindow = async ({
 		newWindow.webContents.send("pageInitData", data);
 	} else if (windowId === "voiceChat") {
 		// 复用语音通话窗口时同步初始化数据
+		newWindow.show();
+		if (newWindow.isMinimized()) {
+			newWindow.restore();
+		}
+		newWindow.focus();
+		newWindow.webContents.send("pageInitData", data);
+	} else if (windowId === "groupVoiceChat") {
+		// 群语音通话窗口复用时同步最新群通话上下文
 		newWindow.show();
 		if (newWindow.isMinimized()) {
 			newWindow.restore();
@@ -509,6 +534,10 @@ export const setupIpcHandlers = () => {
 	});
 	// 处理语音通话信令发送请求（复用同一 WebSocket 连接）
 	ipcMain.on("voicertc:send-signal", (event, message) => {
+		sendSignalMessage(message);
+	});
+	// 群语音通话信令仍复用同一 WebSocket，只是客户端窗口独立路由。
+	ipcMain.on("groupvoicertc:send-signal", (event, message) => {
 		sendSignalMessage(message);
 	});
 };

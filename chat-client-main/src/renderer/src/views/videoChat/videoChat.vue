@@ -105,6 +105,11 @@
 	import avatar from "@/assets/image/avatar/avatar.jpg";
 	import { useUserInfoStore } from "@/stores/userInfoStore";
 	import { storeToRefs } from "pinia";
+	import {
+		formatCallDuration,
+		getCallEventText,
+		sendCallEventMessage
+	} from "@/utils/callMessage";
 
 	const userInfoStore = useUserInfoStore();
 	const { userInfo } = storeToRefs(userInfoStore);
@@ -129,6 +134,7 @@
 	const remoteVideoEnabled = ref(true); // 远端摄像头是否开启（由 camera_toggle 信令驱动）
 	// localStream 是非响应式变量，用此 ref 驱动本地占位符的响应式更新
 	const localVideoReady = ref(false);
+	const isCaller = ref(false);
 
 	const windowControl = {
 		isShowPin: true,
@@ -195,6 +201,9 @@
 	let localStream = null;
 	let peer = null;
 	let isProcessingAnswer = false;
+	let callStartedAt = null;
+	let hasSentFinalMessage = false;
+	let isClosing = false;
 	// 在远程描述设置完成前到达的ICE候选缓冲区
 	let pendingIceCandidates = [];
 
@@ -327,12 +336,14 @@
 				addLog("P2P连接建立成功！");
 				isConnected.value = true;  // 连接成功，切换提示为"已连线"
 				answerReceived.value = false; // 清除中间态
+				if (!callStartedAt) callStartedAt = Date.now();
 			} else if (peer.connectionState === "failed") {
 				addLog("P2P连接失败，尝试重新连接");
 				isConnected.value = false;
 			} else if (peer.connectionState === "disconnected") {
 				addLog("P2P连接断开");
 				isConnected.value = false;
+				if (isCaller.value) sendVideoCallMessage("end");
 				endCall(false);
 			}
 		};
@@ -407,6 +418,7 @@
 				const mediaOk = await getLocalMedia();
 				if (!mediaOk) {
 					addLog("获取媒体流失败，无法发起呼叫");
+					await sendVideoCallMessage("cancel");
 					return;
 				}
 			}
@@ -430,6 +442,7 @@
 			addLog("呼叫已发送，等待应答...");
 		} catch (error) {
 			addLog(`开始呼叫失败: ${error.message}`);
+			await sendVideoCallMessage("cancel");
 			isInCall.value = false;
 			if (peer) {
 				peer.close();
@@ -489,6 +502,7 @@
 		if (signalType == "notOnline" && flog) {
 			flog = false;
 			await notOnline();
+			await sendVideoCallMessage("cancel");
 			setTimeout(() => {
 				isInCall.value = false;
 				if (!flog) flog = true;
@@ -591,14 +605,16 @@
 		}
 	}
 
-	function rejectIncomingCall() {
+	async function rejectIncomingCall() {
+		if (isClosing) return;
+		isClosing = true;
 		incomingCallVisible.value = false;
 		pendingOffer.value = null;
 		// 拒绝来电后通知发起方同步关闭窗口
 		addLog("准备发送拒绝信令");
 		sendSignalMessage("reject_call", {});
 		addLog("已拒绝来电");
-		window.ipcRenderer.send("sendWinControl", { action: "close", type: 0 });
+		closeCurrentWindow();
 	}
 
 	async function handleAnswer(answer) {
@@ -706,18 +722,26 @@
 		addLog("对方已拒绝通话");
 		ElMessage({ message: "对方已拒绝通话", type: "warning", duration: 2000 });
 		// 延迟2秒关窗，确保用户能看清提示
+		await sendVideoCallMessage("reject");
 		await endCall(false, 2000);
 	}
 
 	async function handleEndCall() {
 		addLog("对方结束了通话");
+		await sendVideoCallMessage(callStartedAt ? "end" : "cancel");
 		await endCall(false);
 	}
 
 	// closeDelay: 关窗前的延迟毫秒数，用于拒绝场景让用户看清提示
 	async function endCall(sendSignal = true, closeDelay = 0) {
+		if (isClosing) return;
+		isClosing = true;
+		const shouldRecord = isCaller.value && sendSignal && isInCall.value;
 		if (sendSignal && isInCall.value) {
 			sendSignalMessage("end_call", {});
+		}
+		if (shouldRecord) {
+			await sendVideoCallMessage(callStartedAt ? "end" : "cancel");
 		}
 
 		isInCall.value = false;
@@ -742,7 +766,38 @@
 		if (closeDelay > 0) {
 			await new Promise((resolve) => setTimeout(resolve, closeDelay));
 		}
-		window.ipcRenderer.send("sendWinControl", { action: "close", type: 0 });
+		closeCurrentWindow();
+	}
+
+	function closeCurrentWindow() {
+		window.ipcRenderer.send("sendWinControl", { action: "close", type: 0, force: true });
+	}
+
+	async function handleWindowBeforeClose() {
+		if (incomingCallVisible.value && pendingOffer.value) {
+			await rejectIncomingCall();
+			return;
+		}
+		await endCall(true);
+	}
+
+	async function sendVideoCallMessage(event) {
+		if (!isCaller.value || hasSentFinalMessage || !targetUserId.value) return;
+		hasSentFinalMessage = true;
+		await sendCallEventMessage({
+			contactId: targetUserId.value,
+			sessionId: initData.value?.sessionId,
+			recipientType: 0,
+			userInfo: {
+				userId: currentUserId.value,
+				nickName: initData.value?.currentUserName || userInfo.value?.nickName
+			},
+			messageContent: getCallEventText({
+				mediaType: "video",
+				event,
+				durationText: formatCallDuration(callStartedAt)
+			})
+		});
 	}
 
 	async function notOnline() {
@@ -789,6 +844,10 @@
 			initData.value = data;
 			targetUserId.value = data.recipient;
 			currentUserId.value = data.useId;
+			isCaller.value = data.isCaller === true;
+			callStartedAt = null;
+			hasSentFinalMessage = false;
+			isClosing = false;
 			await syncRemoteProfile(data);
 
 			// pageInitData 到达后才能获取到 useId，在此加载本地用户头像
@@ -805,6 +864,7 @@
 		await getLocalMedia();
 		bindRemoteStream();
 		setupIpcListeners();
+		window.ipcRenderer.on("call-window:before-close", handleWindowBeforeClose);
 	});
 
 	onUnmounted(() => {
@@ -814,6 +874,7 @@
 		if (peer) {
 			peer.close();
 		}
+		window.ipcRenderer.removeListener("call-window:before-close", handleWindowBeforeClose);
 		remover();
 	});
 </script>

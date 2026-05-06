@@ -145,6 +145,11 @@ const routes = [
 		path: "/voiceChat",
 		name: "voiceChat",
 		component: () => import("@/views/voiceChat/voiceChat.vue")
+	},
+	{
+		path: "/groupVoiceChat",
+		name: "groupVoiceChat",
+		component: () => import("@/views/groupVoiceChat/groupVoiceChat.vue")
 	}
 ];
 
@@ -155,4 +160,3 @@ const router = createRouter({
 });
 
 export default router;
-

@@ -100,7 +100,8 @@
 								item.messageType == 9 ||
 								item.messageType == 10 ||
 								item.messageType == 11 ||
-								item.messageType == 12
+								item.messageType == 12 ||
+								item.messageType == 18
 							"
 						>
 							<ChatMessageSys :data="item"></ChatMessageSys>
@@ -139,6 +140,30 @@
 		@del-session="delGroupSession"
 		@change-group-info="changeGroupInfo"
 	></ChatGroupDetail>
+	<el-dialog v-model="groupVoiceDialogVisible" title="选择群语音成员" width="560px">
+		<div class="group-call-member-list" v-loading="groupVoiceLoading">
+			<el-checkbox-group v-model="selectedGroupVoiceUserIds">
+				<div v-for="member in groupVoiceMemberList" :key="member.id" class="group-call-member">
+					<el-checkbox :label="member.id">
+						<div class="member-option">
+							<ShowLocalImage
+								:width="30"
+								:height="30"
+								:file-id="member.id"
+								part-type="avatar"
+								:file-type="0"
+							></ShowLocalImage>
+							<span class="member-name">{{ member.name }}</span>
+						</div>
+					</el-checkbox>
+				</div>
+			</el-checkbox-group>
+		</div>
+		<template #footer>
+			<el-button @click="groupVoiceDialogVisible = false">取消</el-button>
+			<el-button type="primary" @click="confirmGroupVoiceCall">发起通话</el-button>
+		</template>
+	</el-dialog>
 </template>
 
 <script setup>
@@ -150,6 +175,7 @@
 	import MessageSend from "./messageSend.vue";
 	import ChatMessage from "@/views/main/chat/chatMessage.vue";
 	import blank from "@/components/blank.vue";
+	import ShowLocalImage from "@/components/showLocalImage.vue";
 	import SearchSession from "./searchSession.vue";
 	import chatSession from "./chatSession.vue";
 	import "@imengyu/vue3-context-menu/lib/vue3-context-menu.css";
@@ -167,6 +193,7 @@
 	const { userInfo } = storeToRefs(userInfoStore);
 	import { useMessageCountStore } from "@/stores/messageCountStore";
 	const messageCountStore = useMessageCountStore();
+	import { selectGroup } from "@/api/groupContactApi";
 
 	// 哪些消息需要铃声提示
 	const audioMsgType = [1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 14];
@@ -184,6 +211,10 @@
 
 	// 选中会话信息
 	const currentChatSession = ref(null);
+	const groupVoiceDialogVisible = ref(false);
+	const groupVoiceLoading = ref(false);
+	const groupVoiceMemberList = ref([]);
+	const selectedGroupVoiceUserIds = ref([]);
 
 	// 消息分页配置信息
 	let messagePagingInfo = {
@@ -557,6 +588,7 @@
 					case 11: // 退出了群聊
 					case 12: // 被管理员移出了群聊
 					case 13: // 添加好友成功消息
+					case 18: // 群通话系统消息
 						messageCountStore.setCount("chatCount", 1, false);
 						break;
 				}
@@ -707,15 +739,47 @@
 				useId: userInfo.value.userId,
 				currentUserName: userInfo.value.nickName,
 				recipient: currentChatSession.value.contactId,
+				sessionId: currentChatSession.value.sessionId,
 				contactName: currentChatSession.value.contactName,
 				targetEmail: currentChatSession.value.contactId,
+				isCaller: true,
 				autoStart: true
 			}
 		});
 	};
 
+	const onLocalCallMessage = () => {
+		window.ipcRenderer.on("localCallMessage", (e, message) => {
+			const session = message.extendData;
+			if (!session) return;
+
+			let curSession = chatSessionList.value.find((item) => {
+				return item.sessionId == session.sessionId && item.userId == session.userId;
+			});
+			if (!curSession) {
+				chatSessionList.value.push(session);
+			} else {
+				Object.assign(curSession, session);
+			}
+			sortUserSession(chatSessionList.value);
+
+			if (
+				currentChatSession.value &&
+				currentChatSession.value.sessionId == session.sessionId
+			) {
+				messageList.value.push(message);
+				Object.assign(currentChatSession.value, session);
+				scrollToTop();
+			}
+		});
+	};
+
 	// 发起语音通话
-	const startVoiceCall = () => {
+	const startVoiceCall = async () => {
+		if (currentChatSession.value.contactType == 1) {
+			await showGroupVoiceMemberDialog();
+			return;
+		}
 		window.ipcRenderer.send("newWindow", {
 			windowId: "voiceChat",
 			title: "语音通话",
@@ -724,9 +788,75 @@
 				useId: userInfo.value.userId,
 				currentUserName: userInfo.value.nickName,
 				recipient: currentChatSession.value.contactId,
+				sessionId: currentChatSession.value.sessionId,
 				contactName: currentChatSession.value.contactName,
 				targetEmail: currentChatSession.value.contactId,
+				isCaller: true,
 				autoStart: true
+			}
+		});
+	};
+
+	const showGroupVoiceMemberDialog = async () => {
+		groupVoiceDialogVisible.value = true;
+		groupVoiceLoading.value = true;
+		try {
+			const result = await selectGroup(
+				currentChatSession.value.contactId,
+				userInfo.value.userId
+			);
+			groupVoiceMemberList.value = (result.data || []).filter((member) => {
+				return member.id !== userInfo.value.userId;
+			});
+			selectedGroupVoiceUserIds.value = groupVoiceMemberList.value.map((member) => member.id);
+			if (groupVoiceMemberList.value.length === 0) {
+				ElMessage.warning("当前群聊没有可邀请的其他成员");
+			}
+		} finally {
+			groupVoiceLoading.value = false;
+		}
+	};
+
+	const confirmGroupVoiceCall = async () => {
+		if (selectedGroupVoiceUserIds.value.length === 0) {
+			ElMessage.warning("请选择群通话成员");
+			return;
+		}
+
+		const selectedMembers = groupVoiceMemberList.value.filter((member) => {
+			return selectedGroupVoiceUserIds.value.includes(member.id);
+		});
+		const participants = [
+			{
+				id: userInfo.value.userId,
+				name: userInfo.value.nickName,
+				status: "self"
+			},
+			...selectedMembers.map((member) => ({
+				id: member.id,
+				name: member.name,
+				status: "inviting"
+			}))
+		];
+		groupVoiceDialogVisible.value = false;
+		window.ipcRenderer.send("newWindow", {
+			windowId: "groupVoiceChat",
+			title: "群语音通话",
+			path: "/groupVoiceChat",
+			width: 680,
+			height: 620,
+			data: {
+				useId: userInfo.value.userId,
+				currentUserName: userInfo.value.nickName,
+				recipient: currentChatSession.value.contactId,
+				groupId: currentChatSession.value.contactId,
+				groupName: currentChatSession.value.contactName,
+				sessionId: currentChatSession.value.sessionId,
+				callId: crypto.randomUUID(),
+				participants,
+				isCaller: true,
+				autoStart: true,
+				incoming: false
 			}
 		});
 	};
@@ -799,6 +929,7 @@
 	const remover = () => {
 		window.ipcRenderer.removeAllListeners("localSessionDataCallback");
 		window.ipcRenderer.removeAllListeners("reciveMessage");
+		window.ipcRenderer.removeAllListeners("localCallMessage");
 		window.ipcRenderer.removeAllListeners("loadChatMessageCallback");
 		window.ipcRenderer.removeAllListeners("addLocalMessageCallback");
 	};
@@ -807,6 +938,7 @@
 		remover();
 		onLocalSessionDataCallback();
 		onReciveMessage();
+		onLocalCallMessage();
 		onLoadChatMessage();
 		onAddLocalMessageCallback();
 		// 获取会话
@@ -880,5 +1012,31 @@
 	.message-send {
 		border-top: #e7e7e7 solid 1px;
 		height: 130px;
+	}
+
+	.group-call-member-list {
+		min-height: 220px;
+		max-height: 360px;
+		overflow-y: auto;
+
+		.group-call-member {
+			height: 42px;
+			display: flex;
+			align-items: center;
+
+			.member-option {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				min-width: 0;
+			}
+
+			.member-name {
+				max-width: 360px;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+		}
 	}
 </style>

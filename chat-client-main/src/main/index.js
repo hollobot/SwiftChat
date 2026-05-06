@@ -182,6 +182,9 @@ function createWindow() {
 					//窗口从屏幕上消失，但仍在运行。
 					win.hide();
 				} else {
+					if (config.force) {
+						win.__allowClose = true;
+					}
 					win.close();
 				}
 				break;
