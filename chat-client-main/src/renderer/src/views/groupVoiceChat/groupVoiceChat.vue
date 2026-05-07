@@ -1,8 +1,8 @@
 <template>
-	<div class="group-voice-chat">
+	<div :class="['group-voice-chat', { 'is-video-call': isVideoCall }]">
 		<div class="top-bar drag">
 			<div class="top-bar-left">
-				<span class="title-text">{{ groupName || "群语音通话" }}</span>
+				<span class="title-text">{{ groupName || callTitle }}</span>
 				<span class="title-count">{{ connectedCount }}/{{ participantList.length }}</span>
 			</div>
 		</div>
@@ -15,14 +15,28 @@
 
 			<div class="member-grid">
 				<div v-for="member in participantList" :key="member.id" class="member-card">
-					<div :class="['member-avatar', member.status]">
-						<ShowLocalImage
-							:width="52"
-							:height="52"
-							:file-id="member.id"
-							part-type="avatar"
-							:file-type="0"
-						></ShowLocalImage>
+					<div class="member-media">
+						<video
+							v-if="isVideoCall"
+							v-show="member.hasVideo && member.videoEnabled"
+							:ref="(el) => setVideoRef(member.id, el)"
+							class="member-video"
+							autoplay
+							playsinline
+							muted
+						></video>
+						<div
+							v-show="!isVideoCall || !member.hasVideo || !member.videoEnabled"
+							:class="['member-avatar', member.status]"
+						>
+							<ShowLocalImage
+								:width="52"
+								:height="52"
+								:file-id="member.id"
+								part-type="avatar"
+								:file-type="0"
+							></ShowLocalImage>
+						</div>
 					</div>
 					<div class="member-name" :title="member.name">{{ member.name }}</div>
 					<div :class="['member-status', member.status]">
@@ -33,9 +47,9 @@
 			</div>
 
 			<div class="incoming-call-panel" v-if="incomingCallVisible">
-				<div class="incoming-title">收到群语音通话邀请</div>
+				<div class="incoming-title">收到{{ callTitle }}邀请</div>
 				<div class="incoming-desc">
-					{{ inviterName || "群成员" }} 邀请你加入 {{ groupName || "群语音通话" }}
+					{{ inviterName || "群成员" }} 邀请你加入 {{ groupName || callTitle }}
 				</div>
 				<div class="incoming-actions">
 					<button class="action-btn accept-btn" @click="acceptIncomingCall">加入</button>
@@ -61,6 +75,15 @@
 					<button class="ctrl-btn end-btn" @click="endCall" title="挂断">
 						<span class="iconfont icon-dianhua3"></span>
 					</button>
+					<button
+						v-if="isVideoCall"
+						class="ctrl-btn"
+						:class="{ off: !videoEnabled }"
+						@click="toggleVideo"
+						:title="videoEnabled ? '关闭摄像头' : '开启摄像头'"
+					>
+						<span class="iconfont icon-video"></span>
+					</button>
 				</div>
 			</div>
 		</div>
@@ -71,7 +94,7 @@
 <script setup>
 	import WindowControlButton from "@/components/windowControlButton.vue";
 	import ShowLocalImage from "@/components/showLocalImage.vue";
-	import { computed, onMounted, onUnmounted, ref } from "vue";
+	import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 	import { ElMessage } from "element-plus";
 	import { useUserInfoStore } from "@/stores/userInfoStore";
 	import { storeToRefs } from "pinia";
@@ -96,6 +119,8 @@
 	const incomingCallVisible = ref(false);
 	const isInCall = ref(false);
 	const audioEnabled = ref(true);
+	const videoEnabled = ref(true);
+	const mediaType = ref("audio");
 	const audioBox = ref(null);
 	const isCaller = ref(false);
 
@@ -115,11 +140,14 @@
 	let localStream = null;
 	let callStartedAt = null;
 	let hasSentFinalMessage = false;
+	let hasSentCloseRoomSignal = false;
 	let isClosing = false;
 	const peerMap = new Map();
 	const pendingIceMap = new Map();
 	const joinedUserIds = new Set();
 	const remoteAudioMap = new Map();
+	const videoElementMap = new Map();
+	const mediaStreamMap = new Map();
 	const inviteTimerMap = new Map();
 	const removeTimerMap = new Map();
 	const expiredInviteIds = new Set();
@@ -141,16 +169,23 @@
 		).length;
 	});
 
+	const isVideoCall = computed(() => mediaType.value === "video");
+
+	const callTitle = computed(() => {
+		return isVideoCall.value ? "群视频通话" : "群语音通话";
+	});
+
 	const callStatusText = computed(() => {
 		if (incomingCallVisible.value) return "等待你选择是否加入";
-		if (isInCall.value) return "群语音通话中";
-		return "准备群语音通话";
+		if (isInCall.value) return `${callTitle.value}中`;
+		return `准备${callTitle.value}`;
 	});
 
 	const controlHint = computed(() => {
-		if (incomingCallVisible.value) return "加入后会与已在线成员建立点对点语音连接";
-		if (isInCall.value) return "成员加入后会自动建立语音连接";
-		return "正在准备麦克风";
+		const mediaName = isVideoCall.value ? "音视频" : "语音";
+		if (incomingCallVisible.value) return `加入后会与已在线成员建立点对点${mediaName}连接`;
+		if (isInCall.value) return `成员加入后会自动建立${mediaName}连接`;
+		return isVideoCall.value ? "正在准备摄像头和麦克风" : "正在准备麦克风";
 	});
 
 	const controlsText = computed(() => {
@@ -175,7 +210,9 @@
 		return {
 			id: member.id || member.userId,
 			name: member.name || member.nickName || member.contactName || member.id || member.userId,
-			status: member.status || "inviting"
+			status: member.status || "inviting",
+			hasVideo: member.hasVideo || false,
+			videoEnabled: member.videoEnabled !== false
 		};
 	};
 
@@ -282,6 +319,15 @@
 		}
 	};
 
+	// 成员手动重新加入现有通话时，需要清理此前的 reject/no_answer 失效标记，
+	// 否则后续 join/offer/candidate 会被当成过期信令直接忽略。
+	const restoreParticipantJoinEligibility = (userId) => {
+		if (!userId) return;
+		expiredInviteIds.delete(userId);
+		clearInviteTimer(userId);
+		clearRemoveTimer(userId);
+	};
+
 	const startInviteTimer = (userId) => {
 		if (!userId || userId === currentUserId.value) return;
 		clearInviteTimer(userId);
@@ -317,6 +363,37 @@
 		});
 	};
 
+	const setMemberVideoState = (userId, enabled, hasVideo) => {
+		const member = participantList.value.find((item) => item.id === userId);
+		if (!member) return;
+		if (enabled !== undefined) member.videoEnabled = enabled;
+		if (hasVideo !== undefined) member.hasVideo = hasVideo;
+	};
+
+	const bindVideoElement = (userId) => {
+		const el = videoElementMap.get(userId);
+		if (!el) return;
+		el.srcObject = mediaStreamMap.get(userId) || null;
+	};
+
+	const setVideoRef = (userId, el) => {
+		if (!userId) return;
+		if (el) {
+			videoElementMap.set(userId, el);
+			bindVideoElement(userId);
+		} else {
+			videoElementMap.delete(userId);
+		}
+	};
+
+	const bindMemberStream = async (userId, stream) => {
+		mediaStreamMap.set(userId, stream);
+		const hasVideo = stream?.getVideoTracks?.().some((track) => track.readyState === "live") || false;
+		setMemberVideoState(userId, undefined, hasVideo);
+		await nextTick();
+		bindVideoElement(userId);
+	};
+
 	const parseSignalData = (message) => {
 		try {
 			return JSON.parse(message.signalData || "{}");
@@ -332,10 +409,10 @@
 			receiveUserId,
 			signalType,
 			signalData: JSON.stringify(signalData),
-			messageType: 17,
+			messageType: isVideoCall.value ? 15 : 17,
 			callId: callId.value,
 			callMode: "group",
-			mediaType: "audio",
+			mediaType: mediaType.value,
 			groupId: groupId.value,
 			groupName: groupName.value
 		};
@@ -346,6 +423,14 @@
 		window.ipcRenderer.send(
 			"groupvoicertc:send-signal",
 			getBaseSignal(receiveUserId, signalType, signalData)
+		);
+	};
+
+	// 最后一名成员离开时已经没有可广播对象，需要单独通知服务端清理群通话上下文。
+	const sendGroupServerSignal = (signalType, signalData = {}) => {
+		window.ipcRenderer.send(
+			"groupvoicertc:send-signal",
+			getBaseSignal(null, signalType, signalData)
 		);
 	};
 
@@ -361,19 +446,40 @@
 	};
 
 	const getLocalMedia = async () => {
+		let newStream = null;
 		try {
-			const newStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-			if (localStream) {
-				localStream.getTracks().forEach((track) => track.stop());
-			}
-			localStream = newStream;
-			audioEnabled.value = true;
-			return true;
+			newStream = await navigator.mediaDevices.getUserMedia({
+				audio: true,
+				video: isVideoCall.value
+			});
 		} catch (error) {
-			console.error("[GroupVoice] 获取麦克风失败:", error);
-			ElMessage.error("无法获取麦克风权限");
-			return false;
+			if (!isVideoCall.value) {
+				console.error("[GroupVoice] 获取麦克风失败:", error);
+				ElMessage.error("无法获取麦克风权限");
+				return false;
+			}
+			try {
+				// 群视频允许摄像头不可用时降级为纯语音加入，避免整个通话失败。
+				newStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+			} catch (audioError) {
+				console.error("[GroupVoice] 获取音视频失败:", audioError);
+				ElMessage.error("无法获取麦克风权限");
+				return false;
+			}
 		}
+
+		if (localStream) {
+			localStream.getTracks().forEach((track) => track.stop());
+		}
+		localStream = newStream;
+		const hasAudio = localStream?.getAudioTracks?.().some((track) => track.readyState === "live") || false;
+		const hasVideo =
+			localStream?.getVideoTracks?.().some((track) => track.enabled && track.readyState === "live") || false;
+		audioEnabled.value = hasAudio;
+		videoEnabled.value = hasVideo;
+		setMemberVideoState(currentUserId.value, hasVideo, hasVideo);
+		await bindMemberStream(currentUserId.value, localStream);
+		return true;
 	};
 
 	const shouldCreateOffer = (remoteUserId) => {
@@ -398,8 +504,8 @@
 			localStream.getTracks().forEach((track) => peer.addTrack(track, localStream));
 		}
 
-		peer.ontrack = (event) => {
-			attachRemoteAudio(remoteUserId, event.streams[0]);
+		peer.ontrack = async (event) => {
+			await attachRemoteMedia(remoteUserId, event.streams[0]);
 			setMemberStatus(remoteUserId, "connected");
 		};
 
@@ -421,7 +527,7 @@
 		return peer;
 	};
 
-	const attachRemoteAudio = (remoteUserId, stream) => {
+	const attachRemoteMedia = async (remoteUserId, stream) => {
 		let audio = remoteAudioMap.get(remoteUserId);
 		if (!audio) {
 			audio = document.createElement("audio");
@@ -430,6 +536,13 @@
 			remoteAudioMap.set(remoteUserId, audio);
 		}
 		audio.srcObject = stream;
+		if (isVideoCall.value) {
+			await bindMemberStream(remoteUserId, stream);
+			const videoTrack = stream?.getVideoTracks?.()[0];
+			if (videoTrack) {
+				videoTrack.onended = () => setMemberVideoState(remoteUserId, undefined, false);
+			}
+		}
 	};
 
 	const ensureConnectionWith = async (remoteUserId) => {
@@ -438,7 +551,7 @@
 		if (shouldCreateOffer(remoteUserId) && peer.signalingState === "stable") {
 			const offer = await peer.createOffer({
 				offerToReceiveAudio: true,
-				offerToReceiveVideo: false
+				offerToReceiveVideo: isVideoCall.value
 			});
 			await peer.setLocalDescription(offer);
 			sendSignalTo(remoteUserId, "offer", offer);
@@ -476,6 +589,7 @@
 			groupId: groupId.value,
 			groupName: groupName.value,
 			sessionId: sessionId.value,
+			mediaType: mediaType.value,
 			inviterId: currentUserId.value,
 			inviterName: currentUserName.value,
 			callStartedAt,
@@ -489,6 +603,31 @@
 				sendSignalTo(member.id, "group_invite", inviteData);
 			}
 		});
+	};
+
+	const startDirectJoinCall = async () => {
+		const ok = await getLocalMedia();
+		if (!ok) return;
+
+		isInCall.value = true;
+		if (!callStartedAt) {
+			callStartedAt = Date.now();
+		}
+		joinedUserIds.add(currentUserId.value);
+		setMemberStatus(currentUserId.value, "self");
+
+		const activeRemoteMembers = getActiveRemoteMembers();
+		activeRemoteMembers.forEach((member) => joinedUserIds.add(member.id));
+		broadcastSignal("join_call", {
+			callId: callId.value,
+			userId: currentUserId.value,
+			name: currentUserName.value,
+			callStartedAt
+		});
+
+		for (const member of activeRemoteMembers) {
+			await ensureConnectionWith(member.id);
+		}
 	};
 
 	const acceptIncomingCall = async () => {
@@ -526,10 +665,8 @@
 			broadcastMemberStatus(currentUserId.value, status);
 		}
 		setMemberStatus(currentUserId.value, status);
-		setTimeout(() => {
-			cleanup();
-			closeCurrentWindow();
-		}, REMOVE_MEMBER_DELAY);
+		cleanup();
+		closeCurrentWindow();
 	};
 
 	const rejectIncomingCall = () => {
@@ -546,9 +683,10 @@
 
 	const handleGroupInvite = (message) => {
 		const data = parseSignalData(message);
+		mediaType.value = message.mediaType || data.mediaType || "audio";
 		callId.value = message.callId || data.callId;
 		groupId.value = message.groupId || data.groupId;
-		groupName.value = message.groupName || data.groupName || "群语音通话";
+		groupName.value = message.groupName || data.groupName || callTitle.value;
 		sessionId.value = data.sessionId || message.groupId || data.groupId;
 		inviterId.value = message.sendUserId || data.inviterId;
 		inviterName.value = data.inviterName || message.sendUserNickName || "群成员";
@@ -568,7 +706,7 @@
 		const data = parseSignalData(message);
 		const remoteUserId = message.sendUserId || data.userId;
 		if (!remoteUserId || remoteUserId === currentUserId.value) return;
-		if (expiredInviteIds.has(remoteUserId)) return;
+		restoreParticipantJoinEligibility(remoteUserId);
 		clearInviteTimer(remoteUserId);
 		clearRemoveTimer(remoteUserId);
 		if (data.callStartedAt && !callStartedAt) {
@@ -589,7 +727,7 @@
 		if (!isInCall.value) return;
 		const offer = parseSignalData(message);
 		const remoteUserId = message.sendUserId;
-		if (expiredInviteIds.has(remoteUserId)) return;
+		restoreParticipantJoinEligibility(remoteUserId);
 		clearInviteTimer(remoteUserId);
 		const peer = await createPeerConnection(remoteUserId);
 		await peer.setRemoteDescription(new RTCSessionDescription(offer));
@@ -604,7 +742,7 @@
 	const handleAnswer = async (message) => {
 		const answer = parseSignalData(message);
 		const remoteUserId = message.sendUserId;
-		if (expiredInviteIds.has(remoteUserId)) return;
+		restoreParticipantJoinEligibility(remoteUserId);
 		clearInviteTimer(remoteUserId);
 		const peer = peerMap.get(remoteUserId);
 		if (!peer || peer.remoteDescription || peer.signalingState !== "have-local-offer") return;
@@ -616,6 +754,7 @@
 	const handleCandidate = async (message) => {
 		const candidate = parseSignalData(message);
 		const remoteUserId = message.sendUserId;
+		restoreParticipantJoinEligibility(remoteUserId);
 		const peer = peerMap.get(remoteUserId);
 		if (!peer || !peer.remoteDescription) {
 			const pendingList = pendingIceMap.get(remoteUserId) || [];
@@ -642,6 +781,9 @@
 			audio.remove();
 			remoteAudioMap.delete(remoteUserId);
 		}
+		mediaStreamMap.delete(remoteUserId);
+		bindVideoElement(remoteUserId);
+		setMemberVideoState(remoteUserId, false, false);
 	};
 
 	const handleMemberLeave = (message) => {
@@ -649,6 +791,7 @@
 		closePeer(remoteUserId);
 		joinedUserIds.delete(remoteUserId);
 		setMemberStatus(remoteUserId, "left");
+		scheduleMemberRemoval(remoteUserId);
 		if (!isInCall.value && incomingCallVisible.value && remoteUserId === inviterId.value) {
 			incomingCallVisible.value = false;
 			cleanup();
@@ -675,6 +818,13 @@
 		}
 		if (expiredInviteIds.has(remoteUserId)) return;
 		applyFinalMemberStatus(remoteUserId, status);
+	};
+
+	const handleCameraToggle = (message) => {
+		const data = parseSignalData(message);
+		const remoteUserId = message.sendUserId || data.userId;
+		if (!remoteUserId || remoteUserId === currentUserId.value) return;
+		setMemberVideoState(remoteUserId, data.enabled !== false);
 	};
 
 	const handleSignalMessage = async (message) => {
@@ -711,6 +861,9 @@
 				case "member_status":
 					handleMemberStatus(message);
 					break;
+				case "camera_toggle":
+					handleCameraToggle(message);
+					break;
 			}
 		} catch (error) {
 			console.error("[GroupVoice] 处理信令失败:", message.signalType, error);
@@ -731,7 +884,7 @@
 				nickName: currentUserName.value
 			},
 			messageContent: getCallEventText({
-				mediaType: "audio",
+				mediaType: mediaType.value,
 				event,
 				durationText: formatCallDuration(callStartedAt),
 				memberCount: participantList.value.length
@@ -742,6 +895,18 @@
 	const sendFinalCallMessage = async () => {
 		if (!isLastActiveMember()) return;
 		await sendGroupCallMessage("end");
+	};
+
+	const closeGroupCallRoomIfNeeded = () => {
+		if (!isInCall.value || !isLastActiveMember() || hasSentCloseRoomSignal || !groupId.value) {
+			return;
+		}
+		hasSentCloseRoomSignal = true;
+		sendGroupServerSignal("close_group_call", {
+			userId: currentUserId.value,
+			name: currentUserName.value,
+			callStartedAt
+		});
 	};
 
 	const endCall = async () => {
@@ -757,6 +922,7 @@
 				[...ACTIVE_MEMBER_STATUS, ...PENDING_MEMBER_STATUS]
 			);
 			await sendFinalCallMessage();
+			closeGroupCallRoomIfNeeded();
 		}
 		cleanup();
 		closeCurrentWindow();
@@ -786,6 +952,10 @@
 		pendingIceMap.clear();
 		joinedUserIds.clear();
 		expiredInviteIds.clear();
+		mediaStreamMap.clear();
+		videoElementMap.forEach((el) => {
+			el.srcObject = null;
+		});
 	};
 
 	const toggleAudio = () => {
@@ -793,6 +963,21 @@
 		if (!track) return;
 		track.enabled = !track.enabled;
 		audioEnabled.value = track.enabled;
+	};
+
+	const toggleVideo = () => {
+		const track = localStream?.getVideoTracks?.()[0];
+		if (!track) {
+			ElMessage.warning("当前没有可用摄像头");
+			return;
+		}
+		track.enabled = !track.enabled;
+		videoEnabled.value = track.enabled;
+		setMemberVideoState(currentUserId.value, track.enabled, true);
+		broadcastSignal("camera_toggle", {
+			userId: currentUserId.value,
+			enabled: track.enabled
+		});
 	};
 
 	const setupIpcListeners = () => {
@@ -817,13 +1002,16 @@
 			cleanup();
 			callStartedAt = null;
 			hasSentFinalMessage = false;
+			hasSentCloseRoomSignal = false;
 			isClosing = false;
 			currentUserId.value = data.useId;
 			currentUserName.value = data.currentUserName || userInfo.value?.nickName || "我";
+			mediaType.value = data.mediaType || "audio";
 			groupId.value = data.groupId;
-			groupName.value = data.groupName || "群语音通话";
+			groupName.value = data.groupName || callTitle.value;
 			sessionId.value = data.sessionId || data.groupId;
 			callId.value = data.callId || crypto.randomUUID();
+			callStartedAt = data.callStartedAt || null;
 			inviterId.value = data.inviterId || data.useId;
 			inviterName.value = data.inviterName || data.currentUserName;
 			isCaller.value = data.isCaller === true;
@@ -832,6 +1020,8 @@
 
 			if (data.autoStart) {
 				await startOutgoingCall();
+			} else if (data.directJoin) {
+				await startDirectJoinCall();
 			}
 		});
 		setupIpcListeners();
@@ -851,6 +1041,7 @@
 				},
 				[...ACTIVE_MEMBER_STATUS, ...PENDING_MEMBER_STATUS]
 			);
+			closeGroupCallRoomIfNeeded();
 		}
 		cleanup();
 		window.ipcRenderer.removeListener("call-window:before-close", handleWindowBeforeClose);
@@ -934,6 +1125,17 @@
 			padding: 2px 4px 8px;
 		}
 
+		&.is-video-call {
+			.member-grid {
+				grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+			}
+
+			.member-card {
+				min-height: 176px;
+				justify-content: flex-start;
+			}
+		}
+
 		.member-card {
 			min-height: 136px;
 			border-radius: 8px;
@@ -954,6 +1156,27 @@
 			border-color: rgba(31, 168, 86, 0.28);
 			box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
 			transform: translateY(-1px);
+		}
+
+		.member-media {
+			position: relative;
+			width: 100%;
+			min-height: 64px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 8px;
+			overflow: hidden;
+		}
+
+		.member-video {
+			width: 100%;
+			aspect-ratio: 16 / 9;
+			min-height: 102px;
+			object-fit: cover;
+			border-radius: 8px;
+			background: #111827;
+			display: block;
 		}
 
 		.member-avatar {

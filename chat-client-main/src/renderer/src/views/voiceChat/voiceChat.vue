@@ -412,7 +412,7 @@
 	async function handleRejectCall() {
 		ElMessage({ message: "对方已拒绝通话", type: "warning", duration: 2000 });
 		await sendVoiceCallMessage("reject");
-		await endCall(false, 2000);
+		await endCall(false);
 	}
 
 	async function handleEndCall() {

@@ -85,11 +85,11 @@
 						<!-- 展示聊天消息时间 -->
 						<ChatMessageTime v-show="item.showTime" :data="item"></ChatMessageTime>
 						<!--
-						1：//添加好友成功
+						1://添加好友成功
 						3://群创建成功
 						8://解散群聊
 						9://好友加入群组
-						11://退出群聊 
+						11://退出群聊
 						12://退出群聊(踢出)
 						-->
 						<template
@@ -124,9 +124,11 @@
 				<div class="message-send">
 					<MessageSend
 						:current-chat-session="currentChatSession"
+						:disable-group-voice-call="isGroupVoiceButtonDisabled"
+						:disable-group-video-call="isGroupVideoButtonDisabled"
 						@send-message-local="sendMessageLocalHandler"
 						@start-video-call="startVideoCall"
-					@start-voice-call="startVoiceCall"
+						@start-voice-call="startVoiceCall"
 					></MessageSend>
 				</div>
 			</template>
@@ -140,7 +142,7 @@
 		@del-session="delGroupSession"
 		@change-group-info="changeGroupInfo"
 	></ChatGroupDetail>
-	<el-dialog v-model="groupVoiceDialogVisible" title="选择群语音成员" width="560px">
+	<el-dialog v-model="groupVoiceDialogVisible" :title="groupCallDialogTitle" width="560px">
 		<div class="group-call-member-list" v-loading="groupVoiceLoading">
 			<el-checkbox-group v-model="selectedGroupVoiceUserIds">
 				<div v-for="member in groupVoiceMemberList" :key="member.id" class="group-call-member">
@@ -215,6 +217,33 @@
 	const groupVoiceLoading = ref(false);
 	const groupVoiceMemberList = ref([]);
 	const selectedGroupVoiceUserIds = ref([]);
+	const groupCallMediaType = ref("audio");
+	const activeGroupCallState = ref(null);
+	let pendingGroupCallActionMediaType = null;
+	const GROUP_CALL_LABEL = {
+		audio: "语音通话",
+		video: "视频通话"
+	};
+	const groupCallDialogTitle = computed(() => {
+		return groupCallMediaType.value === "video" ? "选择群视频成员" : "选择群语音成员";
+	});
+	const activeGroupCallMediaType = computed(() => {
+		return activeGroupCallState.value?.active ? activeGroupCallState.value.mediaType || "audio" : null;
+	});
+	// 已有群视频时禁用群语音发起按钮，避免同群出现第二条通话渠道。
+	const isGroupVoiceButtonDisabled = computed(() => {
+		return (
+			currentChatSession.value?.contactType == 1 &&
+			activeGroupCallMediaType.value === "video"
+		);
+	});
+	// 已有群语音时禁用群视频发起按钮，避免同群出现第二条通话渠道。
+	const isGroupVideoButtonDisabled = computed(() => {
+		return (
+			currentChatSession.value?.contactType == 1 &&
+			activeGroupCallMediaType.value === "audio"
+		);
+	});
 
 	// 消息分页配置信息
 	let messagePagingInfo = {
@@ -314,7 +343,7 @@
 			}
 
 			// 优化数据合并方式（保持响应式引用）
-			messageList.value.unshift(...dataList); // 新数据在前插入前面
+			messageList.value.unshift(...dataList); // 新数据插入到列表前面
 			messagePagingInfo.pageNo = pageNo;
 			messagePagingInfo.pageTotal = pageTotal;
 
@@ -505,7 +534,7 @@
 				return;
 			}
 
-			// 如果是媒体文件接受数据类型
+			// 如果是媒体文件接收数据类型
 			if (message.messageType == 6) {
 				const messageInfo = messageList.value.find((item) => {
 					if (item.uuid == message.uuid) {
@@ -535,7 +564,7 @@
 					break;
 			}
 
-			//  跟新群昵称
+			// 更新群昵称
 			if (message.messageType == 10) {
 				avatarUpdateStore.triggerUpdate(message.recipientId);
 			}
@@ -560,7 +589,7 @@
 			if (!curSession) {
 				chatSessionList.value.push(session);
 			} else {
-				// 将 session 对象中 拷贝 curSession
+				// 将 session 对象拷贝到 curSession
 				Object.assign(curSession, session);
 			}
 
@@ -575,8 +604,11 @@
 				messageList.value.push(message);
 				scrollToTop(); //接受消息回滚到最底部
 				Object.assign(currentChatSession.value, session); //跟新会话信息
+				if (message.messageType == 18 && currentChatSession.value.contactType == 1) {
+					refreshCurrentGroupCallState();
+				}
 			} else {
-				// 未选择会话需要提示气泡 未读消息提示
+				// 未选择会话需要提示气泡和未读消息
 				switch (message.messageType) {
 					case 1: //添加好友消息
 					case 2: // 文本消息
@@ -616,7 +648,7 @@
 		});
 	};
 
-	// 发送消息更新自己的消息聊表、会话
+	// 发送消息后更新自己的消息列表和会话
 	const sendMessageLocalHandler = (messageObj) => {
 		messageList.value.push(messageObj);
 		const sessionInfo = chatSessionList.value.find((item) => {
@@ -730,7 +762,11 @@
 	});
 
 	// 发起视频通话
-	const startVideoCall = () => {
+	const startVideoCall = async () => {
+		if (currentChatSession.value.contactType == 1) {
+			queryActiveGroupCall("video");
+			return;
+		}
 		window.ipcRenderer.send("newWindow", {
 			windowId: "videoChat",
 			title: "视频通话",
@@ -769,6 +805,10 @@
 			) {
 				messageList.value.push(message);
 				Object.assign(currentChatSession.value, session);
+				if (message.messageType == 18 && currentChatSession.value.contactType == 1) {
+					// 通话结束系统消息到达后，主动查询一次群通话状态，刷新按钮状态。
+					refreshCurrentGroupCallState();
+				}
 				scrollToTop();
 			}
 		});
@@ -777,7 +817,7 @@
 	// 发起语音通话
 	const startVoiceCall = async () => {
 		if (currentChatSession.value.contactType == 1) {
-			await showGroupVoiceMemberDialog();
+			queryActiveGroupCall("audio");
 			return;
 		}
 		window.ipcRenderer.send("newWindow", {
@@ -797,7 +837,8 @@
 		});
 	};
 
-	const showGroupVoiceMemberDialog = async () => {
+	const showGroupVoiceMemberDialog = async (mediaType = "audio") => {
+		groupCallMediaType.value = mediaType;
 		groupVoiceDialogVisible.value = true;
 		groupVoiceLoading.value = true;
 		try {
@@ -838,13 +879,14 @@
 				status: "inviting"
 			}))
 		];
+		const isVideoCall = groupCallMediaType.value === "video";
 		groupVoiceDialogVisible.value = false;
 		window.ipcRenderer.send("newWindow", {
 			windowId: "groupVoiceChat",
-			title: "群语音通话",
+			title: isVideoCall ? "群视频通话" : "群语音通话",
 			path: "/groupVoiceChat",
-			width: 680,
-			height: 620,
+			width: isVideoCall ? 860 : 680,
+			height: isVideoCall ? 680 : 620,
 			data: {
 				useId: userInfo.value.userId,
 				currentUserName: userInfo.value.nickName,
@@ -853,11 +895,115 @@
 				groupName: currentChatSession.value.contactName,
 				sessionId: currentChatSession.value.sessionId,
 				callId: crypto.randomUUID(),
+				mediaType: groupCallMediaType.value,
 				participants,
 				isCaller: true,
 				autoStart: true,
 				incoming: false
 			}
+		});
+	};
+
+	const sendGroupCallStateQuery = () => {
+		if (!currentChatSession.value || currentChatSession.value.contactType != 1) return;
+		window.ipcRenderer.send("groupvoicertc:send-signal", {
+			sendUserId: userInfo.value.userId,
+			signalType: "query_group_call",
+			signalData: "{}",
+			messageType: 17,
+			callMode: "group",
+			mediaType: "audio",
+			groupId: currentChatSession.value.contactId,
+			groupName: currentChatSession.value.contactName
+		});
+	};
+
+	const queryActiveGroupCall = (actionMediaType = null) => {
+		pendingGroupCallActionMediaType = actionMediaType;
+		sendGroupCallStateQuery();
+	};
+
+	const refreshCurrentGroupCallState = () => {
+		sendGroupCallStateQuery();
+	};
+
+	const openExistingGroupCallWindow = (callState) => {
+		const isVideoCall = callState.mediaType === "video";
+		window.ipcRenderer.send("newWindow", {
+			windowId: "groupVoiceChat",
+			title: isVideoCall ? "群视频通话" : "群语音通话",
+			path: "/groupVoiceChat",
+			width: isVideoCall ? 860 : 680,
+			height: isVideoCall ? 680 : 620,
+			data: {
+				useId: userInfo.value.userId,
+				currentUserName: userInfo.value.nickName,
+				recipient: currentChatSession.value.contactId,
+				groupId: callState.groupId || currentChatSession.value.contactId,
+				groupName: callState.groupName || currentChatSession.value.contactName,
+				sessionId: currentChatSession.value.sessionId,
+				callId: callState.callId,
+				mediaType: callState.mediaType || "audio",
+				participants: callState.participants || [],
+				isCaller: false,
+				autoStart: false,
+				directJoin: true,
+				incoming: false,
+				callStartedAt: callState.callStartedAt
+			}
+		});
+	};
+
+	const handleGroupCallQueryResponse = async (callState) => {
+		const actionMediaType = pendingGroupCallActionMediaType;
+		pendingGroupCallActionMediaType = null;
+		if (!actionMediaType) return;
+
+		if (!callState.active) {
+			await showGroupVoiceMemberDialog(actionMediaType);
+			return;
+		}
+
+		const activeMediaType = callState.mediaType || "audio";
+		const activeLabel = GROUP_CALL_LABEL[activeMediaType] || GROUP_CALL_LABEL.audio;
+		if (actionMediaType !== activeMediaType) {
+			ElMessage.warning(`当前群聊正在进行${activeLabel}`);
+			return;
+		}
+
+		try {
+			await ElMessageBox.confirm(
+				`当前群聊正在进行${activeLabel}，是否加入？`,
+				"群通话提示",
+				{
+					confirmButtonText: "加入",
+					cancelButtonText: "取消",
+					type: "info"
+				}
+			);
+			openExistingGroupCallWindow(callState);
+		} catch (error) {
+			// 用户取消加入时不做处理。
+		}
+	};
+
+	const parseGroupCallState = (message) => {
+		try {
+			return JSON.parse(message.signalData || "{}");
+		} catch (error) {
+			console.error("解析群通话状态失败:", error);
+			return {};
+		}
+	};
+
+	const onGroupCallState = () => {
+		window.ipcRenderer.on("groupCallState", async (e, message) => {
+			if (!currentChatSession.value || message.groupId !== currentChatSession.value.contactId) {
+				return;
+			}
+			const callState = parseGroupCallState(message);
+			activeGroupCallState.value = callState.active ? callState : null;
+			await handleGroupCallQueryResponse(callState);
 		});
 	};
 
@@ -915,10 +1061,10 @@
 		(newQuery) => {
 			if (newQuery.timeStamp && newQuery.contactId) {
 				if (chatSessionList.value.length > 0) {
-					// 会话列表已加载,直接处理
+					// 会话列表已加载，直接处理
 					toSendMessage(newQuery.contactId);
 				} else {
-					// 会话列表未加载,保存待处理
+					// 会话列表未加载，保存待处理
 					pendingContactId.value = newQuery.contactId;
 				}
 			}
@@ -926,10 +1072,23 @@
 		{ immediate: true, deep: true }
 	);
 
+	// 切换会话时清空本页记录的群通话状态，避免不同群之间的按钮状态串用。
+	watch(
+		() => currentChatSession.value?.contactId,
+		() => {
+			activeGroupCallState.value = null;
+			pendingGroupCallActionMediaType = null;
+			if (currentChatSession.value?.contactType == 1) {
+				refreshCurrentGroupCallState();
+			}
+		}
+	);
+
 	const remover = () => {
 		window.ipcRenderer.removeAllListeners("localSessionDataCallback");
 		window.ipcRenderer.removeAllListeners("reciveMessage");
 		window.ipcRenderer.removeAllListeners("localCallMessage");
+		window.ipcRenderer.removeAllListeners("groupCallState");
 		window.ipcRenderer.removeAllListeners("loadChatMessageCallback");
 		window.ipcRenderer.removeAllListeners("addLocalMessageCallback");
 	};
@@ -939,6 +1098,7 @@
 		onLocalSessionDataCallback();
 		onReciveMessage();
 		onLocalCallMessage();
+		onGroupCallState();
 		onLoadChatMessage();
 		onAddLocalMessageCallback();
 		// 获取会话

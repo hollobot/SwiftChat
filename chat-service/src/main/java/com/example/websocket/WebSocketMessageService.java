@@ -11,8 +11,11 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
@@ -20,6 +23,7 @@ public class WebSocketMessageService {
 
     @Autowired
     private ChannelContextUtils channelContextUtils;
+    private final Map<String, Map<String, Object>> activeGroupCallMap = new ConcurrentHashMap<>();
 
     /**
      * 处理WebSocket消息的核心方法
@@ -72,14 +76,33 @@ public class WebSocketMessageService {
                     break;
 
                 case "group_invite":
+                    rememberGroupCall(data);
+                    handleGroupCallMessage(ctx, data);
+                    break;
+
                 case "join_call":
                     // 群通话邀请/加入通知仍按目标成员逐个点对点透传。
+                    syncGroupCallParticipantState(data, "joined");
+                    handleGroupCallMessage(ctx, data);
+                    break;
+
+                case "member_status":
+                    syncGroupCallParticipantState(data, null);
                     handleGroupCallMessage(ctx, data);
                     break;
 
                 case "leave_call":
                     // 群通话中单个成员离开，仍按点对点信令透传给其他成员。
+                    syncGroupCallParticipantState(data, "left");
                     handleLeaveCallMessage(ctx, data);
+                    break;
+
+                case "close_group_call":
+                    handleCloseGroupCall(data);
+                    break;
+
+                case "query_group_call":
+                    handleQueryGroupCall(ctx, data);
                     break;
 
                 case "camera_toggle":
@@ -192,6 +215,238 @@ public class WebSocketMessageService {
     private void handleGroupCallMessage(ChannelHandlerContext ctx, PeerConnectionDataDto data) {
         log.info("处理群通话信令: {}, {} -> {}", data.getSignalType(), data.getSendUserId(), data.getReceiveUserId());
         forwardMessageToUser(data);
+    }
+
+    /**
+     * 记录当前群通话上下文，供群聊顶部“加入当前群通话”入口查询。
+     */
+    private void rememberGroupCall(PeerConnectionDataDto data) {
+        if (data.getGroupId() == null) {
+            return;
+        }
+        Map<String, Object> callInfo = parseSignalData(data.getSignalData());
+        callInfo.put("active", true);
+        callInfo.put("callId", data.getCallId());
+        callInfo.put("groupId", data.getGroupId());
+        callInfo.put("groupName", data.getGroupName());
+        callInfo.put("mediaType", data.getMediaType());
+        callInfo.put("inviterId", data.getSendUserId());
+        markParticipantStatus(callInfo, data.getSendUserId(), "joined", String.valueOf(callInfo.get("inviterName")));
+        activeGroupCallMap.put(data.getGroupId(), callInfo);
+        notifyGroupCallState(data.getGroupId(), callInfo, true);
+    }
+
+    /**
+     * 同步群通话成员状态。成员全部离开后清理内存态，避免后续误加入旧通话。
+     */
+    private void updateGroupCallParticipant(PeerConnectionDataDto data, String status) {
+        Map<String, Object> callInfo = activeGroupCallMap.get(data.getGroupId());
+        if (callInfo == null) {
+            return;
+        }
+        Map<String, Object> signalData = parseSignalData(data.getSignalData());
+        String participantId = signalData.get("userId") == null
+                ? data.getSendUserId()
+                : String.valueOf(signalData.get("userId"));
+        String nextStatus = status == null ? String.valueOf(signalData.get("status")) : status;
+        if (nextStatus == null || "null".equals(nextStatus)) {
+            return;
+        }
+        String participantName = signalData.get("name") == null ? participantId : String.valueOf(signalData.get("name"));
+        markParticipantStatus(callInfo, participantId, nextStatus, participantName);
+        if ("left".equals(status) && getActiveParticipantCount(callInfo) == 0) {
+            // 最后一名在线成员离开后，主动广播 inactive，确保聊天页按钮立即恢复状态。
+            notifyGroupCallState(data.getGroupId(), callInfo, false);
+            activeGroupCallMap.remove(data.getGroupId());
+            return;
+        }
+        notifyGroupCallState(data.getGroupId(), callInfo, true);
+        // 仅在群通话没有任何在线成员时才清理，避免只剩 1 人在线时顶部“加入通话”入口提前消失。
+        if ("left".equals(status) && getActiveParticipantCount(callInfo) == 0) {
+            activeGroupCallMap.remove(data.getGroupId());
+        }
+    }
+
+    /**
+     * 查询指定群当前是否存在可加入的群通话。
+     */
+    /**
+     * 新的群通话成员状态同步入口。
+     * 不再复用上面的历史实现，避免旧坏行把通话上下文提前清掉。
+     */
+    private void syncGroupCallParticipantState(PeerConnectionDataDto data, String status) {
+        Map<String, Object> callInfo = activeGroupCallMap.get(data.getGroupId());
+        if (callInfo == null) {
+            return;
+        }
+
+        Map<String, Object> signalData = parseSignalData(data.getSignalData());
+        String participantId = signalData.get("userId") == null
+                ? data.getSendUserId()
+                : String.valueOf(signalData.get("userId"));
+        String nextStatus = status == null ? String.valueOf(signalData.get("status")) : status;
+        if (nextStatus == null || "null".equals(nextStatus)) {
+            return;
+        }
+
+        String participantName = signalData.get("name") == null
+                ? participantId
+                : String.valueOf(signalData.get("name"));
+        markParticipantStatus(callInfo, participantId, nextStatus, participantName);
+
+        if ("left".equals(status) && getActiveParticipantCount(callInfo) == 0) {
+            notifyGroupCallState(data.getGroupId(), callInfo, false);
+            activeGroupCallMap.remove(data.getGroupId());
+            return;
+        }
+
+        notifyGroupCallState(data.getGroupId(), callInfo, true);
+    }
+
+    /**
+     * 最后一名在线成员关闭通话窗口时，前端会显式通知服务端清理群通话上下文。
+     * 这条链路不依赖点对点转发，避免“最后一人退出时没有接收方”导致房间残留。
+     */
+    private void handleCloseGroupCall(PeerConnectionDataDto data) {
+        Map<String, Object> callInfo = activeGroupCallMap.remove(data.getGroupId());
+        if (callInfo == null) {
+            return;
+        }
+        notifyGroupCallState(data.getGroupId(), callInfo, false);
+    }
+
+    private void handleQueryGroupCall(ChannelHandlerContext ctx, PeerConnectionDataDto data) {
+        Map<String, Object> callInfo = activeGroupCallMap.get(data.getGroupId());
+        Map<String, Object> responseData = new HashMap<>();
+        if (callInfo == null) {
+            responseData.put("active", false);
+        } else {
+            responseData.putAll(callInfo);
+            responseData.put("active", true);
+        }
+
+        PeerConnectionDataDto response = new PeerConnectionDataDto();
+        response.setSendUserId(data.getSendUserId());
+        response.setReceiveUserId(data.getSendUserId());
+        response.setSignalType("group_call_state");
+        response.setSignalData(JSON.toJSONString(responseData));
+        response.setCallMode("group");
+        response.setGroupId(data.getGroupId());
+        response.setGroupName(data.getGroupName());
+        response.setCallId(callInfo == null ? null : String.valueOf(callInfo.get("callId")));
+        String mediaType = callInfo == null ? data.getMediaType() : String.valueOf(callInfo.get("mediaType"));
+        response.setMediaType(mediaType);
+        response.setMessageType("video".equals(mediaType) ? 15 : 17);
+        channelContextUtils.sendMessageToUser(data.getSendUserId(), JSON.toJSONString(response));
+    }
+
+    private Map<String, Object> parseSignalData(String signalData) {
+        if (signalData == null || signalData.trim().isEmpty()) {
+            return new HashMap<>();
+        }
+        try {
+            return JSON.parseObject(signalData, Map.class);
+        } catch (Exception e) {
+            log.warn("解析群通话状态失败", e);
+            return new HashMap<>();
+        }
+    }
+
+    private void markParticipantStatus(Map<String, Object> callInfo, String userId, String status, String name) {
+        if (userId == null) {
+            return;
+        }
+        List<Map<String, Object>> participants = getParticipants(callInfo);
+        for (Map<String, Object> participant : participants) {
+            Object id = participant.get("id");
+            if (id == null) {
+                id = participant.get("userId");
+            }
+            if (userId.equals(String.valueOf(id))) {
+                participant.put("status", status);
+                if (name != null && !"null".equals(name)) {
+                    participant.put("name", name);
+                }
+                return;
+            }
+        }
+
+        Map<String, Object> participant = new HashMap<>();
+        participant.put("id", userId);
+        participant.put("name", name == null || "null".equals(name) ? userId : name);
+        participant.put("status", status);
+        participants.add(participant);
+    }
+
+    private List<Map<String, Object>> getParticipants(Map<String, Object> callInfo) {
+        Object participantsObj = callInfo.get("participants");
+        if (participantsObj instanceof List) {
+            return (List<Map<String, Object>>) participantsObj;
+        }
+        List<Map<String, Object>> participants = new ArrayList<>();
+        callInfo.put("participants", participants);
+        return participants;
+    }
+
+    private int getActiveParticipantCount(Map<String, Object> callInfo) {
+        int count = 0;
+        for (Map<String, Object> participant : getParticipants(callInfo)) {
+            Object status = participant.get("status");
+            if ("self".equals(status) || "joined".equals(status) || "connected".equals(status)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 群通话状态发生变化后，把最新状态主动推送给已知成员。
+     * 主聊天页依赖这个信令实时刷新“发起/加入通话”按钮状态。
+     */
+    private void notifyGroupCallState(String groupId, Map<String, Object> callInfo, boolean active) {
+        if (groupId == null || callInfo == null) {
+            return;
+        }
+
+        List<Map<String, Object>> participants = getParticipants(callInfo);
+        if (participants.isEmpty()) {
+            return;
+        }
+
+        Map<String, Object> responseData = new HashMap<>();
+        if (active) {
+            responseData.putAll(callInfo);
+        }
+        responseData.put("active", active);
+
+        String mediaType = String.valueOf(callInfo.getOrDefault("mediaType", "audio"));
+        String inviterId = String.valueOf(callInfo.getOrDefault("inviterId", ""));
+        String groupName = String.valueOf(callInfo.getOrDefault("groupName", ""));
+        String callId = String.valueOf(callInfo.getOrDefault("callId", ""));
+
+        for (Map<String, Object> participant : participants) {
+            Object participantId = participant.get("id");
+            if (participantId == null) {
+                participantId = participant.get("userId");
+            }
+            if (participantId == null) {
+                continue;
+            }
+
+            String receiveUserId = String.valueOf(participantId);
+            PeerConnectionDataDto response = new PeerConnectionDataDto();
+            response.setSendUserId(inviterId);
+            response.setReceiveUserId(receiveUserId);
+            response.setSignalType("group_call_state");
+            response.setSignalData(JSON.toJSONString(responseData));
+            response.setCallMode("group");
+            response.setGroupId(groupId);
+            response.setGroupName(groupName);
+            response.setCallId(callId);
+            response.setMediaType(mediaType);
+            response.setMessageType("video".equals(mediaType) ? 15 : 17);
+            channelContextUtils.sendMessageToUser(receiveUserId, JSON.toJSONString(response));
+        }
     }
 
     /**
@@ -340,6 +595,8 @@ public class WebSocketMessageService {
     private boolean needsReceiveUser(String signalType) {
         return !"heartbeat".equals(signalType) &&
                 !"ping".equals(signalType) &&
+                !"close_group_call".equals(signalType) &&
+                !"query_group_call".equals(signalType) &&
                 !"user_list".equals(signalType);
     }
 

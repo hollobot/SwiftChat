@@ -33,10 +33,28 @@ let heartbeatInterval = null; // 用来保存发送心跳定时器ID
 // 连接状态 默认未连接（必须用 let，updateConnectionStatus 内会重新赋值）
 let connectionStatus = "disconnected";
 
-export const sendToRenderer = (channel, data) => {
-	if (sender && !sender.isDestroyed()) {
-		sender.send(channel, data);
+const sendToWebContents = (target, channel, data) => {
+	if (!target || target.isDestroyed?.()) {
+		return false;
 	}
+	try {
+		target.send(channel, data);
+		return true;
+	} catch (error) {
+		console.warn(`[WS] 发送渲染消息失败: ${channel}`, error.message);
+		return false;
+	}
+};
+
+const sendToCallWindow = (win, channel, data) => {
+	if (!win || win.isDestroyed()) {
+		return false;
+	}
+	return sendToWebContents(win.webContents, channel, data);
+};
+
+export const sendToRenderer = (channel, data) => {
+	return sendToWebContents(sender, channel, data);
 };
 
 export const initWs = (userInfo, _sender) => {
@@ -108,18 +126,18 @@ const createWs = (token) => {
 
 				case 4: //好友申请
 					await updateContactNoReadCount(store.getUserId(), 1, 1, "contact_no_read");
-					sender.send("reciveMessage", message);
+					sendToRenderer("reciveMessage", message);
 					break;
 				case 14: //用户群聊申请
 					await updateContactNoReadCount(store.getUserId(), 1, 1, "group_no_read");
-					sender.send("reciveMessage", message);
+					sendToRenderer("reciveMessage", message);
 					break;
 				case 6: // 文件上传完成
 					await updateMessage({ status: 1 }, { uuid: message.uuid });
-					sender.send("reciveMessage", message);
+					sendToRenderer("reciveMessage", message);
 					break;
 				case 7: // 强制下线
-					sender.send("reciveMessage", message);
+					sendToRenderer("reciveMessage", message);
 					break;
 
 				case 1: //添加好友消息
@@ -199,19 +217,28 @@ const createWs = (token) => {
 					}
 					message.extendData = session;
 					// 发送渲染进程渲染界面
-					sender.send("reciveMessage", message);
+					sendToRenderer("reciveMessage", message);
 					break;
 				case 16: // 用户信息更新（好友改名）
 					// 更新本地 SQLite 中该联系人的会话显示名称
-					sender.send("updateSessionContentName", {
+					sendToRenderer("updateSessionContentName", {
 						contactName: message.contactName,
 						contactId: message.sendUserId
 					});
 					// 通知渲染进程刷新会话列表中的联系人名称
-					sender.send("reciveMessage", message);
+					sendToRenderer("reciveMessage", message);
 					break;
 
 				case 15: // 视频通话信令（messageType=15）
+					if (message.callMode === "group" || message.groupId) {
+						if (message.signalType === "group_call_state") {
+							sendToRenderer("groupCallState", message);
+							break;
+						}
+						await handleGroupCallSignal(message);
+						break;
+					}
+
 					let videoChatWindow = getWindowsMap("videoChat");
 
 					if (!videoChatWindow) {
@@ -234,14 +261,14 @@ const createWs = (token) => {
 							setTimeout(resolve, 2000);
 						});
 
-						videoChatWindow.webContents.send("webrtc:signal-message", {
+						sendToCallWindow(videoChatWindow, "webrtc:signal-message", {
 							...message,
 							sendUserNickName: senderName
 						});
 					} else {
 						const senderSession = await selectUserSessionByContactId(message.sendUserId);
 						const senderName = senderSession?.contactName || message.sendUserNickName;
-						videoChatWindow.webContents.send("webrtc:signal-message", {
+						sendToCallWindow(videoChatWindow, "webrtc:signal-message", {
 							...message,
 							sendUserNickName: senderName
 						});
@@ -250,7 +277,11 @@ const createWs = (token) => {
 
 				case 17: // 语音通话信令（messageType=17）
 					if (message.callMode === "group" || message.groupId) {
-						await handleGroupVoiceSignal(message);
+						if (message.signalType === "group_call_state") {
+							sendToRenderer("groupCallState", message);
+							break;
+						}
+						await handleGroupCallSignal(message);
 						break;
 					}
 
@@ -275,14 +306,14 @@ const createWs = (token) => {
 						// 等待窗口渲染完成后再转发信令
 						await new Promise((resolve) => setTimeout(resolve, 2000));
 
-						voiceChatWindow.webContents.send("voicertc:signal-message", {
+						sendToCallWindow(voiceChatWindow, "voicertc:signal-message", {
 							...message,
 							sendUserNickName: voiceSenderName
 						});
 					} else {
 						const voiceSenderSession = await selectUserSessionByContactId(message.sendUserId);
 						const voiceSenderName = voiceSenderSession?.contactName || message.sendUserNickName;
-						voiceChatWindow.webContents.send("voicertc:signal-message", {
+						sendToCallWindow(voiceChatWindow, "voicertc:signal-message", {
 							...message,
 							sendUserNickName: voiceSenderName
 						});
@@ -380,7 +411,7 @@ export const sendSignalMessage = (message) => {
 		console.error("发送信令失败，WebSocket 未连接:", message.signalType, message);
 		const errorChannel =
 			message.callMode === "group" ? "groupvoicertc:connection-error" : "webrtc:connection-error";
-		sender.send(errorChannel, "WebSocket not connected");
+		sendToRenderer(errorChannel, "WebSocket not connected");
 		return false;
 	}
 
@@ -394,7 +425,7 @@ export const sendSignalMessage = (message) => {
 		console.error("发送信令异常:", message.signalType, error);
 		const errorChannel =
 			message.callMode === "group" ? "groupvoicertc:connection-error" : "webrtc:connection-error";
-		sender.send(errorChannel, "Failed to send signal message");
+		sendToRenderer(errorChannel, "Failed to send signal message");
 		return false;
 	}
 };
@@ -407,15 +438,15 @@ const updateConnectionStatus = (status) => {
 	connectionStatus = status;
 	const videoChatWindow = getWindowsMap("videoChat");
 	if (videoChatWindow) {
-		videoChatWindow.webContents.send("webrtc:connection-status", status);
+		sendToCallWindow(videoChatWindow, "webrtc:connection-status", status);
 	}
 	const voiceChatWindow = getWindowsMap("voiceChat");
 	if (voiceChatWindow) {
-		voiceChatWindow.webContents.send("voicertc:connection-status", status);
+		sendToCallWindow(voiceChatWindow, "voicertc:connection-status", status);
 	}
 	const groupVoiceChatWindow = getWindowsMap("groupVoiceChat");
 	if (groupVoiceChatWindow) {
-		groupVoiceChatWindow.webContents.send("groupvoicertc:connection-status", status);
+		sendToCallWindow(groupVoiceChatWindow, "groupvoicertc:connection-status", status);
 	}
 };
 
@@ -428,8 +459,10 @@ const parseSignalData = (message) => {
 	}
 };
 
-const handleGroupVoiceSignal = async (message) => {
+const handleGroupCallSignal = async (message) => {
 	let groupVoiceChatWindow = getWindowsMap("groupVoiceChat");
+	const mediaType = message.mediaType || (message.messageType === 15 ? "video" : "audio");
+	const callTitle = mediaType === "video" ? "群视频通话" : "群语音通话";
 
 	if (!groupVoiceChatWindow) {
 		// 只有群通话邀请需要自动打开窗口，其余群内点对点信令没有窗口时直接忽略。
@@ -443,7 +476,8 @@ const handleGroupVoiceSignal = async (message) => {
 			...signalData,
 			callId: message.callId,
 			groupId: message.groupId,
-			groupName: message.groupName || groupSession?.contactName || "群语音通话",
+			groupName: message.groupName || groupSession?.contactName || callTitle,
+			mediaType,
 			inviterId: message.sendUserId,
 			inviterName: signalData.inviterName || message.sendUserNickName,
 			currentUserName: store.getUserData("userInfo")?.nickName,
@@ -455,7 +489,7 @@ const handleGroupVoiceSignal = async (message) => {
 		await new Promise((resolve) => setTimeout(resolve, 2000));
 	}
 
-	groupVoiceChatWindow.webContents.send("groupvoicertc:signal-message", message);
+	sendToCallWindow(groupVoiceChatWindow, "groupvoicertc:signal-message", message);
 };
 
 // 打开视频聊天窗口
@@ -488,14 +522,15 @@ const voiceChat = async (useId, recipient, extraData = {}) => {
 	await openWindow(param);
 };
 
-// 打开群语音通话窗口
+// 打开群通话窗口，语音和视频共用同一个群通话页面。
 const groupVoiceChat = async (useId, recipient, extraData = {}) => {
+	const isVideoCall = extraData.mediaType === "video";
 	const param = {
 		windowId: "groupVoiceChat",
-		title: "群语音通话",
+		title: isVideoCall ? "群视频通话" : "群语音通话",
 		path: "/groupVoiceChat",
-		width: 680,
-		height: 620,
+		width: isVideoCall ? 860 : 680,
+		height: isVideoCall ? 680 : 620,
 		data: {
 			useId,
 			recipient,
@@ -508,5 +543,5 @@ const groupVoiceChat = async (useId, recipient, extraData = {}) => {
 // 跟新会话
 const updateLocalSessionData = async (e) => {
 	const sessionList = await selectUserSessionList();
-	e.send("localSessionDataCallback", sessionList);
+	sendToWebContents(e, "localSessionDataCallback", sessionList);
 };

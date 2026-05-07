@@ -47,20 +47,19 @@
 					<div class="iconfont icon-wenjianjia"></div>
 				</el-upload>
 			</div>
-			<!-- 单聊展示语音/视频，群聊当前只开放语音，视频类型留给后续扩展。 -->
+			<!-- 单聊、群聊都开放语音/视频入口，群视频会复用群通话窗口。 -->
 			<div
 				v-if="currentChatSession.contactType == 0 || currentChatSession.contactType == 1"
 				class="call-actions"
 			>
 				<div
-					class="video-call-entry iconfont icon-dianhua3"
-					title="语音通话"
+					:class="['video-call-entry iconfont icon-dianhua3', { disabled: isGroupVoiceCallDisabled() }]"
+					:title="isGroupVoiceCallDisabled() ? '当前群聊正在进行视频通话' : '语音通话'"
 					@click="startVoiceCall"
 				></div>
 				<div
-					v-if="currentChatSession.contactType == 0"
-					class="video-call-entry iconfont icon-video"
-					title="视频通话"
+					:class="['video-call-entry iconfont icon-video', { disabled: isGroupVideoCallDisabled() }]"
+					:title="isGroupVideoCallDisabled() ? '当前群聊正在进行语音通话' : '视频通话'"
 					@click="startVideoCall"
 				></div>
 			</div>
@@ -131,8 +130,24 @@
 		currentChatSession: {
 			type: Object,
 			default: {}
+		},
+		disableGroupVoiceCall: {
+			type: Boolean,
+			default: false
+		},
+		disableGroupVideoCall: {
+			type: Boolean,
+			default: false
 		}
 	});
+
+	const isGroupVoiceCallDisabled = () => {
+		return props.currentChatSession?.contactType == 1 && props.disableGroupVoiceCall;
+	};
+
+	const isGroupVideoCallDisabled = () => {
+		return props.currentChatSession?.contactType == 1 && props.disableGroupVideoCall;
+	};
 
 	// 处理键盘事件
 	const handleKeydown = async (e) => {
@@ -458,6 +473,12 @@
 				&:hover {
 					color: #07c160;
 					opacity: 1;
+				}
+
+				&.disabled {
+					color: #c0c4cc;
+					cursor: not-allowed;
+					opacity: 0.7;
 				}
 			}
 		}

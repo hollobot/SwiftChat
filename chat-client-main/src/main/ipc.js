@@ -41,6 +41,24 @@ import { delWindowsMap, getWindowsMap, setWindowsMap, windowsMap } from "./windo
 
 const CALL_WINDOW_IDS = ["videoChat", "voiceChat", "groupVoiceChat"];
 
+// 通话窗口在异步回调里可能已经被关闭，这里统一做安全发送。
+const sendToWindow = (win, channel, data) => {
+	if (!win || win.isDestroyed()) {
+		return false;
+	}
+	const { webContents } = win;
+	if (!webContents || webContents.isDestroyed()) {
+		return false;
+	}
+	try {
+		webContents.send(channel, data);
+		return true;
+	} catch (error) {
+		console.warn(`[IPC] 发送窗口消息失败: ${channel}`, error.message);
+		return false;
+	}
+};
+
 /**
  * 登录成功进入main页面
  * @param {fun} callback
@@ -69,10 +87,7 @@ export const winControl = (callback) => {
 };
 
 const sendWindowMaxState = (win) => {
-	if (!win || win.isDestroyed()) {
-		return;
-	}
-	win.webContents.send("winMaxStateChange", { isMax: win.isMaximized() });
+	sendToWindow(win, "winMaxStateChange", { isMax: win?.isMaximized?.() });
 };
 
 /**
@@ -248,7 +263,7 @@ export const openWindow = async ({
 		newWindow.once("show", () => {
 			setTimeout(() => {
 				// 发送给渲染进程
-				newWindow.webContents.send("pageInitData", data);
+				sendToWindow(newWindow, "pageInitData", data);
 			}, 500);
 		});
 		// 监听窗口关闭
@@ -256,9 +271,12 @@ export const openWindow = async ({
 			if (!CALL_WINDOW_IDS.includes(windowId) || newWindow.__allowClose) {
 				return;
 			}
-			// 通话窗口需要先让渲染进程发送拒绝/离开信令，再由渲染进程二次确认关闭。
+			// 通话窗口先通知渲染进程自行收尾；若窗口已销毁，则直接放行关闭。
+			if (!sendToWindow(newWindow, "call-window:before-close")) {
+				newWindow.__allowClose = true;
+				return;
+			}
 			event.preventDefault();
-			newWindow.webContents.send("call-window:before-close");
 		});
 		newWindow.on("closed", () => {
 			delWindowsMap(windowId);
@@ -268,7 +286,7 @@ export const openWindow = async ({
 		// 是否移除任务栏
 		newWindow.setSkipTaskbar(false);
 		// 发送给渲染进程
-		newWindow.webContents.send("pageInitData", data);
+		sendToWindow(newWindow, "pageInitData", data);
 	} else if (windowId === "admin") {
 		// 显示窗口
 		newWindow.show();
@@ -288,7 +306,7 @@ export const openWindow = async ({
 		// 聚焦窗口
 		newWindow.focus();
 		// 复用视频通话窗口时，也要同步最新的页面初始化数据
-		newWindow.webContents.send("pageInitData", data);
+		sendToWindow(newWindow, "pageInitData", data);
 	} else if (windowId === "voiceChat") {
 		// 复用语音通话窗口时同步初始化数据
 		newWindow.show();
@@ -296,7 +314,7 @@ export const openWindow = async ({
 			newWindow.restore();
 		}
 		newWindow.focus();
-		newWindow.webContents.send("pageInitData", data);
+		sendToWindow(newWindow, "pageInitData", data);
 	} else if (windowId === "groupVoiceChat") {
 		// 群语音通话窗口复用时同步最新群通话上下文
 		newWindow.show();
@@ -304,7 +322,7 @@ export const openWindow = async ({
 			newWindow.restore();
 		}
 		newWindow.focus();
-		newWindow.webContents.send("pageInitData", data);
+		sendToWindow(newWindow, "pageInitData", data);
 	}
 };
 

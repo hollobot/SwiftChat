@@ -721,9 +721,8 @@
 	async function handleRejectCall() {
 		addLog("对方已拒绝通话");
 		ElMessage({ message: "对方已拒绝通话", type: "warning", duration: 2000 });
-		// 延迟2秒关窗，确保用户能看清提示
 		await sendVideoCallMessage("reject");
-		await endCall(false, 2000);
+		await endCall(false);
 	}
 
 	async function handleEndCall() {
