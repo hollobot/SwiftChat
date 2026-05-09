@@ -13,7 +13,7 @@
 				<div class="status-desc">{{ controlHint }}</div>
 			</div>
 
-			<div class="member-grid">
+			<div class="member-grid" :style="memberGridStyle">
 				<div v-for="member in participantList" :key="member.id" class="member-card">
 					<div class="member-media">
 						<video
@@ -116,6 +116,7 @@
 	const inviterId = ref("");
 	const inviterName = ref("");
 	const participantList = ref([]);
+	const viewportWidth = ref(window.innerWidth);
 	const incomingCallVisible = ref(false);
 	const isInCall = ref(false);
 	const audioEnabled = ref(true);
@@ -148,6 +149,7 @@
 	const remoteAudioMap = new Map();
 	const videoElementMap = new Map();
 	const mediaStreamMap = new Map();
+	const pendingVideoOfferIds = new Set();
 	const inviteTimerMap = new Map();
 	const removeTimerMap = new Map();
 	const expiredInviteIds = new Set();
@@ -170,6 +172,23 @@
 	});
 
 	const isVideoCall = computed(() => mediaType.value === "video");
+
+	const memberGridStyle = computed(() => {
+		const count = Math.max(participantList.value.length, 1);
+		let columns = count <= 2 ? count : Math.ceil(Math.sqrt(count * 1.6));
+		if (viewportWidth.value < 520) {
+			columns = 1;
+		} else if (viewportWidth.value < 640 && count > 1) {
+			columns = Math.min(2, count);
+		} else if (count <= 3) {
+			columns = count;
+		}
+		const rows = Math.ceil(count / columns);
+		return {
+			gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+			gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`
+		};
+	});
 
 	const callTitle = computed(() => {
 		return isVideoCall.value ? "群视频通话" : "群语音通话";
@@ -349,6 +368,12 @@
 		});
 	};
 
+	const getJoinableMembers = (members = []) => {
+		return members.filter((member) => {
+			return ACTIVE_MEMBER_STATUS.includes(member.status);
+		});
+	};
+
 	const isLastActiveMember = () => {
 		return isInCall.value && getActiveRemoteMembers().length === 0;
 	};
@@ -370,10 +395,35 @@
 		if (hasVideo !== undefined) member.hasVideo = hasVideo;
 	};
 
+	const hasLiveVideoTrack = (stream) => {
+		return stream?.getVideoTracks?.().some((track) => track.readyState === "live") || false;
+	};
+
+	const syncMemberVideoVisibility = (userId) => {
+		const stream = mediaStreamMap.get(userId);
+		setMemberVideoState(userId, undefined, hasLiveVideoTrack(stream));
+	};
+
+	const bindVideoTrackEvents = (userId, track) => {
+		if (!track) return;
+		track.onmute = () => syncMemberVideoVisibility(userId);
+		track.onunmute = () => syncMemberVideoVisibility(userId);
+		track.onended = () => setMemberVideoState(userId, undefined, false);
+	};
+
 	const bindVideoElement = (userId) => {
 		const el = videoElementMap.get(userId);
 		if (!el) return;
 		el.srcObject = mediaStreamMap.get(userId) || null;
+		// Keep autoplay stable after srcObject changes.
+		el.muted = true;
+		el.play?.().catch(() => {});
+		el.onloadedmetadata = () => syncMemberVideoVisibility(userId);
+		el.onloadeddata = () => syncMemberVideoVisibility(userId);
+		el.oncanplay = () => syncMemberVideoVisibility(userId);
+		el.onplaying = () => syncMemberVideoVisibility(userId);
+		el.onresize = () => syncMemberVideoVisibility(userId);
+		syncMemberVideoVisibility(userId);
 	};
 
 	const setVideoRef = (userId, el) => {
@@ -388,8 +438,9 @@
 
 	const bindMemberStream = async (userId, stream) => {
 		mediaStreamMap.set(userId, stream);
-		const hasVideo = stream?.getVideoTracks?.().some((track) => track.readyState === "live") || false;
-		setMemberVideoState(userId, undefined, hasVideo);
+		// Show video by stream track state, not by the video element render timing.
+		setMemberVideoState(userId, undefined, hasLiveVideoTrack(stream));
+		bindVideoTrackEvents(userId, stream?.getVideoTracks?.()[0]);
 		await nextTick();
 		bindVideoElement(userId);
 	};
@@ -486,6 +537,26 @@
 		return String(currentUserId.value) < String(remoteUserId);
 	};
 
+	const sendVideoOfferWhenStable = async (remoteUserId, peer) => {
+		if (!peer || peer.connectionState === "closed") return;
+		if (peer.signalingState !== "stable") {
+			pendingVideoOfferIds.add(remoteUserId);
+			return;
+		}
+		pendingVideoOfferIds.delete(remoteUserId);
+		const offer = await peer.createOffer({
+			offerToReceiveAudio: true,
+			offerToReceiveVideo: true
+		});
+		await peer.setLocalDescription(offer);
+		sendSignalTo(remoteUserId, "offer", offer);
+	};
+
+	const flushPendingVideoOffer = async (remoteUserId) => {
+		if (!pendingVideoOfferIds.has(remoteUserId)) return;
+		await sendVideoOfferWhenStable(remoteUserId, peerMap.get(remoteUserId));
+	};
+
 	const createPeerConnection = async (remoteUserId) => {
 		const exist = peerMap.get(remoteUserId);
 		if (exist && exist.connectionState !== "closed") {
@@ -502,6 +573,10 @@
 
 		if (localStream) {
 			localStream.getTracks().forEach((track) => peer.addTrack(track, localStream));
+		}
+		if (isVideoCall.value && !localStream?.getVideoTracks?.().length) {
+			// Reserve the video m-line so later camera enabling can reuse this transceiver.
+			peer.addTransceiver("video", { direction: "recvonly" });
 		}
 
 		peer.ontrack = async (event) => {
@@ -522,6 +597,13 @@
 				setMemberStatus(remoteUserId, "joined");
 			}
 		};
+		peer.onsignalingstatechange = () => {
+			if (peer.signalingState !== "stable") return;
+			// Camera can be enabled during negotiation; send the video offer when stable.
+			flushPendingVideoOffer(remoteUserId).catch((error) => {
+				console.error("[GroupVoice] 补发视频协商失败:", error);
+			});
+		};
 
 		peerMap.set(remoteUserId, peer);
 		return peer;
@@ -538,10 +620,6 @@
 		audio.srcObject = stream;
 		if (isVideoCall.value) {
 			await bindMemberStream(remoteUserId, stream);
-			const videoTrack = stream?.getVideoTracks?.()[0];
-			if (videoTrack) {
-				videoTrack.onended = () => setMemberVideoState(remoteUserId, undefined, false);
-			}
 		}
 	};
 
@@ -745,7 +823,8 @@
 		restoreParticipantJoinEligibility(remoteUserId);
 		clearInviteTimer(remoteUserId);
 		const peer = peerMap.get(remoteUserId);
-		if (!peer || peer.remoteDescription || peer.signalingState !== "have-local-offer") return;
+		// 摄像头从无到有会重新协商，此时已有旧 remoteDescription，不能因此丢弃新 answer。
+		if (!peer || peer.signalingState !== "have-local-offer") return;
 		await peer.setRemoteDescription(new RTCSessionDescription(answer));
 		await flushPendingCandidates(remoteUserId);
 		setMemberStatus(remoteUserId, "joined");
@@ -782,6 +861,7 @@
 			remoteAudioMap.delete(remoteUserId);
 		}
 		mediaStreamMap.delete(remoteUserId);
+		pendingVideoOfferIds.delete(remoteUserId);
 		bindVideoElement(remoteUserId);
 		setMemberVideoState(remoteUserId, false, false);
 	};
@@ -824,7 +904,13 @@
 		const data = parseSignalData(message);
 		const remoteUserId = message.sendUserId || data.userId;
 		if (!remoteUserId || remoteUserId === currentUserId.value) return;
-		setMemberVideoState(remoteUserId, data.enabled !== false);
+		const enabled = data.enabled !== false;
+		if (!enabled) {
+			setMemberVideoState(remoteUserId, false, false);
+			return;
+		}
+		setMemberVideoState(remoteUserId, true, false);
+		nextTick(() => syncMemberVideoVisibility(remoteUserId));
 	};
 
 	const handleSignalMessage = async (message) => {
@@ -937,7 +1023,10 @@
 			rejectIncomingCall();
 			return;
 		}
-		endCall();
+		endCall().catch((error) => {
+			console.error("[GroupVoice] 关闭通话窗口失败:", error);
+			closeCurrentWindow();
+		});
 	};
 
 	const cleanup = () => {
@@ -950,6 +1039,7 @@
 		}
 		Array.from(peerMap.keys()).forEach((remoteUserId) => closePeer(remoteUserId));
 		pendingIceMap.clear();
+		pendingVideoOfferIds.clear();
 		joinedUserIds.clear();
 		expiredInviteIds.clear();
 		mediaStreamMap.clear();
@@ -965,18 +1055,70 @@
 		audioEnabled.value = track.enabled;
 	};
 
-	const toggleVideo = () => {
-		const track = localStream?.getVideoTracks?.()[0];
-		if (!track) {
-			ElMessage.warning("当前没有可用摄像头");
-			return;
+	const publishLocalVideoTrack = async (videoTrack) => {
+		if (!localStream || !videoTrack) return;
+		for (const [remoteUserId, peer] of peerMap.entries()) {
+			if (!peer || peer.connectionState === "closed") continue;
+			let transceiver = peer.getTransceivers().find((item) => {
+				return item.sender?.track?.kind === "video" || item.receiver?.track?.kind === "video";
+			});
+			if (!transceiver) {
+				transceiver = peer.addTransceiver(videoTrack, { direction: "sendrecv", streams: [localStream] });
+			} else if (transceiver.sender) {
+				transceiver.direction = "sendrecv";
+				await transceiver.sender.replaceTrack(videoTrack);
+			} else {
+				peer.addTrack(videoTrack, localStream);
+			}
+			await sendVideoOfferWhenStable(remoteUserId, peer);
 		}
-		track.enabled = !track.enabled;
-		videoEnabled.value = track.enabled;
-		setMemberVideoState(currentUserId.value, track.enabled, true);
+	};
+
+	const ensureLocalVideoTrack = async () => {
+		let track = localStream?.getVideoTracks?.()[0];
+		if (track && track.readyState === "live") {
+			return track;
+		}
+		try {
+			const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+			track = cameraStream.getVideoTracks()[0];
+			if (!track) return null;
+			if (!localStream) {
+				localStream = new MediaStream();
+			}
+			localStream.getVideoTracks().forEach((item) => {
+				item.stop();
+				localStream.removeTrack(item);
+			});
+			localStream.addTrack(track);
+			// Publish to peers only; local view binding is completed after videoEnabled is restored.
+			await publishLocalVideoTrack(track);
+			return track;
+		} catch (error) {
+			console.error("[GroupVoice] 开启摄像头失败:", error);
+			ElMessage.warning("当前没有可用摄像头");
+			return null;
+		}
+	};
+
+	const toggleVideo = async () => {
+		const currentTrack = localStream?.getVideoTracks?.()[0];
+		const willEnable = !(currentTrack && currentTrack.readyState === "live" && currentTrack.enabled);
+		const track = willEnable ? await ensureLocalVideoTrack() : currentTrack;
+		if (!track) return;
+		track.enabled = willEnable;
+		videoEnabled.value = willEnable;
+		if (!willEnable) {
+			setMemberVideoState(currentUserId.value, false, false);
+		} else {
+			// The card uses member-level videoEnabled, so restore it with the global button state.
+			setMemberVideoState(currentUserId.value, true, hasLiveVideoTrack(localStream));
+			await bindMemberStream(currentUserId.value, localStream);
+			setTimeout(() => syncMemberVideoVisibility(currentUserId.value), 300);
+		}
 		broadcastSignal("camera_toggle", {
 			userId: currentUserId.value,
-			enabled: track.enabled
+			enabled: willEnable
 		});
 	};
 
@@ -996,8 +1138,13 @@
 		window.ipcRenderer.removeAllListeners("groupvoicertc:connection-status");
 	};
 
+	const updateViewportWidth = () => {
+		viewportWidth.value = window.innerWidth;
+	};
+
 	onMounted(() => {
 		remover();
+		window.addEventListener("resize", updateViewportWidth);
 		window.ipcRenderer.on("pageInitData", async (event, data) => {
 			cleanup();
 			callStartedAt = null;
@@ -1015,7 +1162,10 @@
 			inviterId.value = data.inviterId || data.useId;
 			inviterName.value = data.inviterName || data.currentUserName;
 			isCaller.value = data.isCaller === true;
-			initMembers(data.participants || []);
+			// Only show members that are actually in the existing room when joining directly.
+			initMembers(
+				data.directJoin ? getJoinableMembers(data.participants || []) : data.participants || []
+			);
 			incomingCallVisible.value = data.incoming === true;
 
 			if (data.autoStart) {
@@ -1031,7 +1181,9 @@
 	onUnmounted(() => {
 		if (isInCall.value) {
 			if (isLastActiveMember()) {
-				sendGroupCallMessage("end");
+				sendGroupCallMessage("end").catch((error) => {
+					console.error("[GroupVoice] 发送结束消息失败:", error);
+				});
 			}
 			broadcastSignal(
 				"leave_call",
@@ -1045,6 +1197,7 @@
 		}
 		cleanup();
 		window.ipcRenderer.removeListener("call-window:before-close", handleWindowBeforeClose);
+		window.removeEventListener("resize", updateViewportWidth);
 		remover();
 	});
 </script>
@@ -1117,37 +1270,45 @@
 		.member-grid {
 			flex: 1;
 			min-height: 0;
-			overflow-y: auto;
+			overflow: hidden;
 			display: grid;
 			grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
-			align-content: start;
+			align-content: stretch;
+			justify-content: stretch;
 			gap: 14px;
-			padding: 2px 4px 8px;
+			padding: 8px;
 		}
 
 		&.is-video-call {
-			.member-grid {
-				grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+			.member-video {
+				flex: 1 1 auto;
+				min-height: 0;
 			}
 
-			.member-card {
-				min-height: 176px;
-				justify-content: flex-start;
+			.member-avatar {
+				position: relative;
+				z-index: 1;
 			}
 		}
 
 		.member-card {
-			min-height: 136px;
+			width: calc(100% - 8px);
+			height: calc(100% - 8px);
+			align-self: stretch;
+			min-height: 0;
+			box-sizing: border-box;
 			border-radius: 8px;
 			background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
 			border: 1px solid rgba(15, 23, 42, 0.08);
 			display: flex;
 			flex-direction: column;
 			align-items: center;
-			justify-content: center;
+			justify-content: flex-start;
 			gap: 8px;
+			margin: 4px;
 			min-width: 0;
 			padding: 14px 10px;
+			overflow: hidden;
 			box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
 			transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 		}
@@ -1160,19 +1321,22 @@
 
 		.member-media {
 			position: relative;
+			flex: 1 1 0;
 			width: 100%;
-			min-height: 64px;
+			height: auto;
+			min-height: 0;
 			display: flex;
 			align-items: center;
 			justify-content: center;
 			border-radius: 8px;
+			background: #f3f4f6;
 			overflow: hidden;
 		}
 
 		.member-video {
 			width: 100%;
-			aspect-ratio: 16 / 9;
-			min-height: 102px;
+			height: 100%;
+			min-height: 0;
 			object-fit: cover;
 			border-radius: 8px;
 			background: #111827;
@@ -1220,6 +1384,7 @@
 
 		.member-name {
 			width: 100%;
+			flex-shrink: 0;
 			text-align: center;
 			font-size: 13px;
 			font-weight: 600;
@@ -1231,6 +1396,7 @@
 
 		.member-status {
 			height: 24px;
+			flex-shrink: 0;
 			max-width: 100%;
 			display: inline-flex;
 			align-items: center;
@@ -1395,7 +1561,8 @@
 			}
 
 			.member-card {
-				min-height: 126px;
+				height: calc(100% - 8px);
+				min-height: 0;
 				padding: 12px 8px;
 			}
 

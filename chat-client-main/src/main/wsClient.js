@@ -47,10 +47,15 @@ const sendToWebContents = (target, channel, data) => {
 };
 
 const sendToCallWindow = (win, channel, data) => {
-	if (!win || win.isDestroyed()) {
+	try {
+		if (!win || win.isDestroyed()) {
+			return false;
+		}
+		return sendToWebContents(win.webContents, channel, data);
+	} catch (error) {
+		console.warn(`[WS] 发送通话窗口消息失败: ${channel}`, error.message);
 		return false;
 	}
-	return sendToWebContents(win.webContents, channel, data);
 };
 
 export const sendToRenderer = (channel, data) => {

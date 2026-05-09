@@ -43,14 +43,14 @@ const CALL_WINDOW_IDS = ["videoChat", "voiceChat", "groupVoiceChat"];
 
 // 通话窗口在异步回调里可能已经被关闭，这里统一做安全发送。
 const sendToWindow = (win, channel, data) => {
-	if (!win || win.isDestroyed()) {
-		return false;
-	}
-	const { webContents } = win;
-	if (!webContents || webContents.isDestroyed()) {
-		return false;
-	}
 	try {
+		if (!win || win.isDestroyed()) {
+			return false;
+		}
+		const { webContents } = win;
+		if (!webContents || webContents.isDestroyed()) {
+			return false;
+		}
 		webContents.send(channel, data);
 		return true;
 	} catch (error) {

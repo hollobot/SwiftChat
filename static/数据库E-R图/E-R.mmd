@@ -1,3 +1,4 @@
+```
 ---
 config:
   layout: elk
@@ -14,92 +15,94 @@ erDiagram
     CHAT_MESSAGE ||--o{ CHAT_SESSION : "属于"
     CHAT_SESSION ||--o{ CHAT_SESSION_USER : "包含"
 
-    USER_INFO {
-        varchar user_id PK "用户ID，主键"
-        varchar email UK "邮箱，唯一"
-        varchar nick_name "用户昵称"
-        tinyint join_type "加入方式"
-        tinyint sex "性别 0女 1男"
-        varchar password "登录密码"
-        varchar personal_signature "个性签名"
-        datetime create_time "创建时间"
-    }
+USER_INFO {
+    varchar user_id PK "用户ID，主键"
+    varchar email UK "邮箱，唯一"
+    varchar nick_name "用户昵称"
+    tinyint join_type "加入方式"
+    tinyint sex "性别 0女 1男"
+    varchar password "登录密码"
+    varchar personal_signature "个性签名"
+    datetime create_time "创建时间"
+}
 
-    USER_CONTACT {
-        varchar user_id PK,FK "用户ID"
-        varchar contact_id PK,FK "联系人ID"
-        varchar contact_remarks "联系人备注"
-        tinyint status "好友状态"
-        datetime create_time "创建时间"
-    }
+USER_CONTACT {
+    varchar user_id PK,FK "用户ID"
+    varchar contact_id PK,FK "联系人ID"
+    varchar contact_remarks "联系人备注"
+    tinyint status "好友状态"
+    datetime create_time "创建时间"
+}
 
-    GROUP_INFO {
-        varchar group_id PK "群ID"
-        varchar group_name "群名称"
-        varchar owner_id FK "群主ID"
-        varchar group_announcement "群公告"
-        tinyint join_type "入群方式"
-        tinyint status "群状态"
-    }
+GROUP_INFO {
+    varchar group_id PK "群ID"
+    varchar group_name "群名称"
+    varchar owner_id FK "群主ID"
+    varchar group_announcement "群公告"
+    tinyint join_type "入群方式"
+    tinyint status "群状态"
+}
 
-    GROUP_CONTACT {
-        varchar user_id PK,FK "用户ID"
-        varchar group_id PK,FK "群ID"
-        varchar owner_id "群主ID"
-        varchar group_remarks "群内备注"
-        tinyint status "成员状态"
-    }
+GROUP_CONTACT {
+    varchar user_id PK,FK "用户ID"
+    varchar group_id PK,FK "群ID"
+    varchar owner_id "群主ID"
+    varchar group_remarks "群内备注"
+    tinyint status "成员状态"
+}
 
-    CHAT_MESSAGE {
-        varchar uuid PK "消息唯一标识"
-        varchar session_id FK "会话ID"
-        tinyint message_type "消息类型"
-        varchar message_content "消息内容"
-        varchar send_user_id FK "发送人ID"
-        bigint send_time "发送时间戳"
-        varchar recipient_id FK "接收方ID"
-        tinyint recipient_type "接收类型 0单聊 1群聊"
-    }
+CHAT_MESSAGE {
+    varchar uuid PK "消息唯一标识"
+    varchar session_id FK "会话ID"
+    tinyint message_type "消息类型"
+    varchar message_content "消息内容"
+    varchar send_user_id FK "发送人ID"
+    bigint send_time "发送时间戳"
+    varchar recipient_id FK "接收方ID"
+    tinyint recipient_type "接收类型 0单聊 1群聊"
+}
 
-    CHAT_SESSION {
-        varchar session_id PK "会话ID"
-        varchar last_message "最后一条消息"
-        bigint last_receive_time "最后消息时间"
-    }
+CHAT_SESSION {
+    varchar session_id PK "会话ID"
+    varchar last_message "最后一条消息"
+    bigint last_receive_time "最后消息时间"
+}
 
-    CHAT_SESSION_USER {
-        varchar user_id PK,FK "用户ID"
-        varchar contact_id PK "联系人ID"
-        varchar session_id FK "会话ID"
-    }
+CHAT_SESSION_USER {
+    varchar user_id PK,FK "用户ID"
+    varchar contact_id PK "联系人ID"
+    varchar session_id FK "会话ID"
+}
 
-    USER_APPLY_INFO {
-        varchar applicant_user_id PK,FK "申请人ID"
-        varchar recipient_id PK,FK "接收人ID"
-        bigint status "申请状态"
-        datetime apply_time "申请时间"
-        varchar apply_info "申请说明"
-    }
+USER_APPLY_INFO {
+    varchar applicant_user_id PK,FK "申请人ID"
+    varchar recipient_id PK,FK "接收人ID"
+    bigint status "申请状态"
+    datetime apply_time "申请时间"
+    varchar apply_info "申请说明"
+}
 
-    GROUP_APPLY_INFO {
-        varchar applicant_user_id PK,FK "申请人ID"
-        varchar group_id PK,FK "群ID"
-        varchar owner_id "群主ID"
-        bigint status "申请状态"
-        datetime apply_time "申请时间"
-    }
+GROUP_APPLY_INFO {
+    varchar applicant_user_id PK,FK "申请人ID"
+    varchar group_id PK,FK "群ID"
+    varchar owner_id "群主ID"
+    bigint status "申请状态"
+    datetime apply_time "申请时间"
+}
 
-    CUSTOM_ACCOUNT {
-        varchar custom_account_id PK "自定义账号ID"
-        varchar email UK "邮箱"
-        varchar user_id UK "用户ID"
-        tinyint status "使用状态"
-    }
+CUSTOM_ACCOUNT {
+    varchar custom_account_id PK "自定义账号ID"
+    varchar email UK "邮箱"
+    varchar user_id UK "用户ID"
+    tinyint status "使用状态"
+}
 
-    APP_VERSION {
-        varchar id PK "版本ID"
-        varchar version_code UK "版本号"
-        text update_description "更新说明"
-        tinyint status "发布状态"
-        datetime create_time "创建时间"
-    }
+APP_VERSION {
+    varchar id PK "版本ID"
+    varchar version_code UK "版本号"
+    text update_description "更新说明"
+    tinyint status "发布状态"
+    datetime create_time "创建时间"
+}
+```
+

@@ -174,6 +174,9 @@ function createWindow() {
 		const { action, type } = config;
 		const webContents = e.sender;
 		const win = BrowserWindow.fromWebContents(webContents);
+		if (!win || win.isDestroyed()) {
+			return;
+		}
 		switch (action) {
 			case "close": {
 				if (type === 1) {
@@ -185,7 +188,11 @@ function createWindow() {
 					if (config.force) {
 						win.__allowClose = true;
 					}
-					win.close();
+					try {
+						win.close();
+					} catch (error) {
+						console.warn("[WindowControl] close ignored:", error.message);
+					}
 				}
 				break;
 			}
