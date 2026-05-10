@@ -99,8 +99,8 @@ const routes = [
 		]
 	},
 	{
-		path: "/showMedai",
-		name: "showMedai",
+		path: "/showMedia",
+		name: "showMedia",
 		component: () => import("@/views/show/showMedia.vue")
 	},
 	{

@@ -222,50 +222,53 @@
 		messageObj.userId = userInfo.value.userId;
 
 		// 发送http请求发送信息
-		const data = await send({
-			uuid: crypto.randomUUID(),
-			contactId: props.currentChatSession.contactId,
-			messageContent: escapeHtml(messageObj.messageContent),
-			messageType: messageObj.messageType,
-			fileSize: messageObj.fileSize,
-			fileName: messageObj.fileName,
-			fileType: messageObj.fileType
-		});
+		try {
+			const data = await send({
+				uuid: crypto.randomUUID(),
+				contactId: props.currentChatSession.contactId,
+				messageContent: escapeHtml(messageObj.messageContent),
+				messageType: messageObj.messageType,
+				fileSize: messageObj.fileSize,
+				fileName: messageObj.fileName,
+				fileType: messageObj.fileType
+			});
 
 		//  是否清空文本内容
-		if (cleanMsgContent) {
-			messageContent.value = "";
-		}
+			if (cleanMsgContent) {
+				messageContent.value = "";
+			}
 
-		if (data.code == 901 || data.code == 902) {
+			if (data.code == 901 || data.code == 902) {
 			// 不是好友提示
-			ElMessage({
-				message: data.data.message,
-				type: "error"
-			});
-			return;
-		}
+				ElMessage({
+					message: data.data.message,
+					type: "error"
+				});
+				return;
+			}
 
-		if (data.data == null) {
-			const data = {
-				lastMessage: messageObj.messageContent,
-				recipientId: messageObj.sendUserId,
-				recipientType: 0,
-				sendTime: Date.now(),
-				sendUserNickName: userInfo.value.nickName,
-				status: 1,
-				uuid: crypto.randomUUID()
-			};
-			Object.assign(messageObj, data);
-		} else {
-			Object.assign(messageObj, data.data);
-		}
+			if (data.data == null) {
+				const data = {
+					lastMessage: messageObj.messageContent,
+					recipientId: messageObj.sendUserId,
+					recipientType: 0,
+					sendTime: Date.now(),
+					sendUserNickName: userInfo.value.nickName,
+					status: 1,
+					uuid: crypto.randomUUID()
+				};
+				Object.assign(messageObj, data);
+			} else {
+				Object.assign(messageObj, data.data);
+			}
 
 		// 跟新本地消息
-		emit("sendMessageLocal", messageObj);
+			emit("sendMessageLocal", messageObj);
 		// 插入数据到本地数据库里、如果是文件还会上传服务器
-		window.ipcRenderer.send("addLocalMessage", messageObj);
-		flog.value = false; // 重置发送状态
+			window.ipcRenderer.send("addLocalMessage", messageObj);
+		} finally {
+			flog.value = false;
+		}
 	};
 
 	// 选择文件传输

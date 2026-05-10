@@ -270,10 +270,13 @@
 			setLocalItem("userInfo", data.data);
 
 			// 5、发送给主进程创建main窗口
-			window.ipcRenderer.send("toMain", data.data);
+			init();
+			await new Promise((resolve) => {
+				window.ipcRenderer.once("toMainCallback", resolve);
+				window.ipcRenderer.send("toMain", data.data);
+			});
 
 			// 6、初始数据给主进程
-			init();
 
 			// 登录成功跳转（组件销毁）
 			router.push("/main");

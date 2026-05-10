@@ -396,7 +396,9 @@
 	};
 
 	const hasLiveVideoTrack = (stream) => {
-		return stream?.getVideoTracks?.().some((track) => track.readyState === "live") || false;
+		return stream?.getVideoTracks?.().some((track) => {
+			return track.readyState === "live" && !track.muted;
+		}) || false;
 	};
 
 	const syncMemberVideoVisibility = (userId) => {
@@ -618,6 +620,7 @@
 			remoteAudioMap.set(remoteUserId, audio);
 		}
 		audio.srcObject = stream;
+		audio.play?.().catch(() => {});
 		if (isVideoCall.value) {
 			await bindMemberStream(remoteUserId, stream);
 		}

@@ -14,6 +14,7 @@ import com.example.entity.pojo.ChatSession;
 import com.example.handler.CustomException;
 import com.example.mapper.ChatMessageMapper;
 import com.example.mapper.ChatSessionMapper;
+import com.example.mapper.UserInfoMapper;
 import com.example.service.ChatMessageService;
 import com.example.utils.ArrayUtils;
 import com.example.utils.DateFormatUtils;
@@ -53,6 +54,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     @Resource
     private ChatMessageMapper chatMessageMapper;
+
+    @Resource
+    private UserInfoMapper userInfoMapper;
 
     @Resource
     private MessageHandler messageHandler;
@@ -114,6 +118,11 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         }
         Integer status = chatMessage.getMessageType() == MessageTypeEnum.MEDIA_CHAT.getType() ? 0 : 1;
         chatMessage.setStatus(status);
+        String latestNickName = userInfoMapper.selectNameById(chatMessage.getSendUserId());
+        if (!StringUtils.isEmpty(latestNickName)) {
+            // 消息展示名以发送瞬间的用户资料为准，不依赖登录 token 中的历史昵称。
+            chatMessage.setSendUserNickName(latestNickName);
+        }
 
         // 处理换行
         //        chatMessage.setMessageContent(StringUtils.cleanHtmlTag(chatMessage.getMessageContent()));

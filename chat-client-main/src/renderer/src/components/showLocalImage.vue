@@ -74,10 +74,11 @@
 		// &fileType=${props.fileType}&showCover=${props.showCover}&forceGet=${props.forceGet}`);
 
 		const prot = globalInfo.value.fileServerProt || getLocalItem("fileServerProt");
+		if (!prot) {
+			return "";
+		}
 
-		return `http://127.0.0.1:${prot}/file?
-		fileId=${props.fileId}&partType=${props.partType}
-		&fileType=${props.fileType}&showCover=${props.showCover}&forceGet=${props.forceGet}&_t=${Date.now()}`;
+		return `http://127.0.0.1:${prot}/file?fileId=${props.fileId}&partType=${props.partType}&fileType=${props.fileType}&showCover=${props.showCover}&forceGet=${props.forceGet}&_t=${Date.now()}`;
 	});
 
 	// 查看图片强制去服务器获取刷新本地图片
@@ -94,7 +95,7 @@
 		window.ipcRenderer.send("newWindow", {
 			windowId: "media",
 			title: "头像查看",
-			path: "/showMedai",
+			path: "/showMedia",
 			data: {
 				currentFileId: fileId,
 				fileList: [

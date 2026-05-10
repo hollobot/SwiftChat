@@ -407,6 +407,13 @@ export const closeWs = () => {
 	stopHeartbeat();
 };
 
+const getSignalErrorChannel = (message) => {
+	if (message.callMode === "group") {
+		return "groupvoicertc:connection-error";
+	}
+	return message.messageType === 17 ? "voicertc:connection-error" : "webrtc:connection-error";
+};
+
 /**
  * 发送信令消息到服务器
  * @param {Object} message - 信令消息对象
@@ -414,8 +421,7 @@ export const closeWs = () => {
 export const sendSignalMessage = (message) => {
 	if (!ws || ws.readyState !== WebSocket.OPEN) {
 		console.error("发送信令失败，WebSocket 未连接:", message.signalType, message);
-		const errorChannel =
-			message.callMode === "group" ? "groupvoicertc:connection-error" : "webrtc:connection-error";
+		const errorChannel = getSignalErrorChannel(message);
 		sendToRenderer(errorChannel, "WebSocket not connected");
 		return false;
 	}
@@ -428,8 +434,7 @@ export const sendSignalMessage = (message) => {
 		return true;
 	} catch (error) {
 		console.error("发送信令异常:", message.signalType, error);
-		const errorChannel =
-			message.callMode === "group" ? "groupvoicertc:connection-error" : "webrtc:connection-error";
+		const errorChannel = getSignalErrorChannel(message);
 		sendToRenderer(errorChannel, "Failed to send signal message");
 		return false;
 	}

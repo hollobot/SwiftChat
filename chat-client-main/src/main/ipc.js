@@ -64,15 +64,17 @@ const sendToWindow = (win, channel, data) => {
  * @param {fun} callback
  */
 export const winToMain = (callback) => {
-	ipcMain.on("toMain", (e, userInfo) => {
+	ipcMain.on("toMain", async (e, userInfo) => {
 		// 1、保存信息
 		store.setUserId(userInfo.userId);
 		store.setUserData("userInfo", userInfo);
+		// 用户配置决定本地文件服务端口，必须先落库并启动服务。
+		await addUserSetting(userInfo.userId, userInfo.email);
 		callback(userInfo);
 		// 2、ws 初始化操作
 		initWs(userInfo, e.sender);
 		// 3、添加用户配置
-		addUserSetting(userInfo.userId, userInfo.email);
+		e.sender.send("toMainCallback");
 	});
 };
 

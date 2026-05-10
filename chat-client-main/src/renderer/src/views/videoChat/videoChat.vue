@@ -152,7 +152,9 @@
 	const currentAvatar = ref(avatar);
 
 	const hasRemoteVideoTrack = computed(() => {
-		return remoteStream.value?.getVideoTracks?.().some((track) => track.readyState === "live") || false;
+		return remoteStream.value?.getVideoTracks?.().some((track) => {
+			return track.readyState === "live" && !track.muted;
+		}) || false;
 	});
 
 	const showRemotePlaceholder = computed(() => {
@@ -269,9 +271,12 @@
 	function bindRemoteStream() {
 		if (remoteVideo.value && remoteStream.value) {
 			remoteVideo.value.srcObject = remoteStream.value;
+			remoteVideo.value.play?.().catch(() => {});
 			// 只有远端存在可用视频轨时才显示大窗视频，否则显示头像占位
 			hasRemoteStream.value =
-				remoteStream.value?.getVideoTracks?.().some((track) => track.readyState === "live") || false;
+				remoteStream.value?.getVideoTracks?.().some((track) => {
+					return track.readyState === "live" && !track.muted;
+				}) || false;
 		}
 	}
 

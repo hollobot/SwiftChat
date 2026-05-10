@@ -194,7 +194,10 @@
 		peer.ontrack = (event) => {
 			// 将远端音频流绑定到隐藏 audio 元素以播放声音
 			const remoteAudio = document.getElementById("remoteAudio");
-			if (remoteAudio) remoteAudio.srcObject = event.streams[0];
+			if (remoteAudio) {
+				remoteAudio.srcObject = event.streams[0];
+				remoteAudio.play?.().catch(() => {});
+			}
 		};
 
 		peer.onicecandidate = (event) => {

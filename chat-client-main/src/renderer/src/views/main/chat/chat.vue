@@ -713,7 +713,7 @@
 		window.ipcRenderer.send("newWindow", {
 			windowId: "media",
 			title: "图片查看",
-			path: "/showMedai",
+			path: "/showMedia",
 			data: {
 				currentFileId: messageUUid,
 				fileList: showFileList
