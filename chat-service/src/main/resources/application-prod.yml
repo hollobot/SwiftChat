@@ -103,7 +103,7 @@ mybatis-plus:
   type-aliases-package: com.example.entity.pojo
 
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
     # MyBatis 配置
     map-underscore-to-camel-case: true
   global-config: # 这里的缩进层级错误
@@ -112,9 +112,15 @@ mybatis-plus:
         # 数据库配置 使用数据库自增 ID 作为主键。
         id-type: auto
 
-#logging:
-#  level:
-#    org.springframework.boot.context.properties: DEBUG
+logging:
+  level:
+    root: INFO
+    com.example: INFO
+    org.springframework: WARN
+    org.mybatis: WARN
+    com.baomidou.mybatisplus: WARN
+    com.alibaba.druid: WARN
+    io.netty: WARN
 
 springfox:
   documentation:
